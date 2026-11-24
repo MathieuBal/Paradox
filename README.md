@@ -1,4 +1,4 @@
-# PARADOX — Prototype 0.3.0
+# PARADOX — Version 0.4.0
 
 Jeu de déduction spatiale à missions procédurales. Toutes les sondes et l'anomalie sont à placer par le joueur ; aucun placement n'est fourni sur la carte.
 
@@ -17,7 +17,7 @@ En local, depuis le dépôt cloné : `python -m http.server 8000`, puis http://l
 - Le rapport contextuel affiche aussi les indices où l'entité sélectionnée est mentionnée. Les exclusions sont des notes manuelles. Les signaux représentent les positions proposées, pas la solution.
 - Indice : première pression, orientation vers un raisonnement ; deuxième pression, révélation de la case. Aucun indice ne place automatiquement une entité.
 
-## Difficulté V3
+## Difficulté
 
 - Initiation : mission fixe 5×5, deux positions directement identifiables à partir des rapports, puis déductions simples. La convergence sert à localiser l'anomalie finale.
 - Facile : 4×4, au moins deux positions directes, solution complète par élimination à partir de positions certaines et unicité de ligne/colonne.
@@ -40,6 +40,11 @@ Le moteur V3 change les missions procédurales associées aux graines V2. Les an
 
 301 missions : initiation et 100 par difficulté. Deux solveurs indépendants vérifient l'unicité, la nécessité de la convergence pour les missions procédurales, la reproductibilité, la contiguïté, la validité et le profil logique. Le contrôle vérifie également l'absence de rapports de coordonnées fixes.
 
-## Suite
+## Atelier de déduction V4
 
-Tests visuels et utilisateurs sur mobile, ajustement des rapports, difficulté ressentie, sauvegarde et nouvelles mécaniques après validation du gameplay.
+- Hypothèses ajoute ou retire la sonde sélectionnée parmi les candidates d’une case. Exclusions conserve les impossibilités propres à chaque sonde.
+- Le journal permet de cocher un rapport exploité. Les deux types de notes et les placements peuvent être annulés.
+- La dernière partie est sauvegardée dans le navigateur. Les liens V3 conservent leurs anciennes grilles. Le partage transmet la mission vierge, sauf si ce navigateur possède déjà une sauvegarde de la même mission.
+- En intermédiaire et expert, les rapports peuvent comparer les distances à deux équipements, proposer deux zones ou relier deux sondes sur une diagonale. Le générateur exige au moins deux familles de rapports, trois en expert.
+- Le premier indice s’appuie sur les domaines restants du solveur. Le deuxième révèle la case déduite.
+- L’anomalie du jour utilise la date UTC comme graine commune. La génération procédurale tourne dans un Web Worker sur les navigateurs compatibles.

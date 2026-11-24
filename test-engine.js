@@ -7,7 +7,7 @@ function brute(B, convergence=true, limit=2) {
  function clue(c){
   const p=v[c.a],q=c.b==null?-1:v[c.b],o=B.objects.indexOf(c.o);
   if(p<0||(c.b!=null&&q<0))return true;
-  switch(c.type){case"zone":return B.zones[p]===c.z;case"edge":return (R(p)===0||R(p)===n-1||C(p)===0||C(p)===n-1)===c.y;case"objectOffset":return R(p)-R(o)===c.dr&&C(p)-C(o)===c.dc;case"near":return D(p,o)===1;case"distance":return D(p,o)===c.d;case"axis":return c.axis==="r"?R(p)===R(o):C(p)===C(o);case"offset":return R(p)-R(q)===c.dr&&C(p)-C(q)===c.dc;case"order":return Math.sign(c.axis==="r"?R(p)-R(q):C(p)-C(q))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;case"fixed":return p===c.p;default:throw Error(c.type)}
+  switch(c.type){case"diagonal":return Math.abs(R(p)-R(q))===Math.abs(C(p)-C(q));case"zonePair":return [c.z,c.alt].includes(B.zones[p]);case"closer":return D(p,o)<D(p,B.objects.indexOf(c.other));case"zone":return B.zones[p]===c.z;case"edge":return (R(p)===0||R(p)===n-1||C(p)===0||C(p)===n-1)===c.y;case"objectOffset":return R(p)-R(o)===c.dr&&C(p)-C(o)===c.dc;case"near":return D(p,o)===1;case"distance":return D(p,o)===c.d;case"axis":return c.axis==="r"?R(p)===R(o):C(p)===C(o);case"offset":return R(p)-R(q)===c.dr&&C(p)-C(q)===c.dc;case"order":return Math.sign(c.axis==="r"?R(p)-R(q):C(p)-C(q))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;case"fixed":return p===c.p;default:throw Error(c.type)}
  }
  function signal(p,dir,t){const delta={N:[-1,0],S:[1,0],W:[0,-1],E:[0,1]}[dir];for(let k=1;k<=3;k++){const r=R(p)+delta[0]*k,c=C(p)+delta[1]*k;if(r<0||r>=n||c<0||c>=n||B.objects[r*n+c]!=null)return false;if(r*n+c===t)return true}return false}
  function visit(i,rows,cols){

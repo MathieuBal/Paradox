@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg"><defs>
+<g id="base"><path fill="#091b29" stroke="#acc8d1" d="m6 30 14-7 14 7-14 7z"/><path fill="#334f60" d="m6 30 14 5 14-5-14 3z"/></g>
+<symbol id="unit-0" viewBox="0 0 40 40"><use href="#base"/><path fill="#526e7a" stroke="#c3e0da" d="m18 29 2-12 4 13zM7 10q4 19 22 11z"/><path stroke="#88ede8" stroke-width="2" d="m17 16 7-7"/><circle fill="#d1ffed" cx="24" cy="9" r="2"/></symbol>
+<symbol id="unit-1" viewBox="0 0 40 40"><use href="#base"/><path stroke="#99b6be" fill="#344c5e" d="M7 17 27 12l6 5-20 6zM7 17v10l6 4v-8m0 0 20-6v10l-20 4z"/><path stroke="#8debd1" d="m16 25 13-4"/></symbol>
+<symbol id="unit-2" viewBox="0 0 40 40"><use href="#base"/><path fill="#527382" stroke="#cadcde" d="M10 12h20v15c-2 6-18 6-20 0z"/><ellipse cx="20" cy="12" rx="10" ry="4" fill="#92b7ba"/><path stroke="#70ecd9" stroke-width="3" d="M13 16v9"/></symbol>
+<symbol id="unit-3" viewBox="0 0 40 40"><use href="#base"/><rect x="8" y="10" width="24" height="21" rx="4" fill="#547586" stroke="#d2e1de"/><circle cx="20" cy="20" r="8" fill="#172e40"/><path fill="#86dada" d="M19 19q-9-7 1-6zM21 19q7-8 6 2zM21 21q6 9-2 6zM19 21q-8 6-6-2z"/></symbol>
+<symbol id="unit-4" viewBox="0 0 40 40"><use href="#base"/><path fill="#786c51" stroke="#dbcbaa" d="m8 13 14-5 10 6v14l-14 5-10-6zm0 0 10 6 14-5m-14 5v14"/><path stroke="#e6c68f" d="m10 18 6 9m5 1 8-9"/></symbol>
+<symbol id="unit-5" viewBox="0 0 40 40"><use href="#base"/><path fill="#40576b" stroke="#aac1ca" d="m7 24 5-14 20 2-2 16-8 5z"/><path fill="#84e7cf" d="m14 13 14 1-2 7-14-1z"/><path stroke="#e2c58d" d="m12 24 5 1m2 0 6 1"/></symbol>
+<symbol id="unit-6" viewBox="0 0 40 40"><use href="#base"/><path fill="#4d6174" stroke="#c3d2d9" d="m10 14 8-5 12 5v14l-8 5-12-5z"/><path fill="#ffe395" d="m21 13-7 10h5l-1 5 9-12h-6z"/></symbol>
+</defs></svg>

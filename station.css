@@ -1,0 +1,18 @@
+:root{--cyan:#90ead7;--bg:#091119;--panel:#121f29;--line:#34464e;--muted:#b2c0ca}
+body{background:radial-gradient(ellipse at 85% 0%,#204343 0,transparent 42rem),var(--bg)}
+header{position:relative;overflow:hidden;padding:1.25rem 1rem;border:1px solid #465d64;border-radius:14px;background:linear-gradient(110deg,#132632 15%,#153a3b 90%)}
+header .eyebrow,.map-heading,.progress-row{font-family:ui-monospace,monospace;color:#aecdc9}
+h1{font-size:clamp(2.3rem,8vw,4rem);line-height:1.13;font-weight:750;letter-spacing:.12em}
+.orbital{position:absolute;right:5%;width:100px;height:100px;border-radius:50%;background:repeating-linear-gradient(15deg,transparent 0 7px,#b1ddbe26 9px 10px),radial-gradient(circle at 28% 28%,#b3cfb3,#5c9691 33%,#244752 62%,#10242e 75%);box-shadow:0 0 45px #88dfc51a}
+.orbital i,.orbital b{position:absolute;inset:32% -40%;border:3px double #ccddc1a3;border-radius:50%;transform:rotate(-22deg)}.orbital b{inset:24% -26%;border:1px solid #93c9c44a}
+.mission-menu{max-width:850px}.mission-menu h2{font-size:1.45rem;letter-spacing:0}.difficulty-card{position:relative;overflow:hidden;background:linear-gradient(125deg,#182830,#101e28);border-top:3px solid var(--level)}
+.menu-actions{display:flex;gap:8px;flex-wrap:wrap}#daily{background:#223a39;border-color:#547a70}.panel{box-shadow:0 8px 28px #02080d33}
+.map{border:1px solid #657e81;background:#101b22;box-shadow:0 3px 16px #060d14 inset}
+.cell{background-image:linear-gradient(135deg,#aed8bd12,transparent 60%,#0002)}
+.with-probe .glyph{border-radius:50%;background:radial-gradient(ellipse at 30% 20%,#47606a,#192633 75%);border:2px solid var(--token);box-shadow:0 2px 4px #050d14;min-width:1.25em;text-align:center;line-height:1.12}
+.glyph svg{display:block;width:1.45em;height:1.45em}.obstacle .glyph{line-height:0}
+.report-line{display:grid;grid-template-columns:1fr 44px;gap:4px;margin:6px 0}.report-line .report{margin:0}.file-report{color:#b5ccc7;padding:0}.filed .report,.focus-panel li.filed{text-decoration:line-through;color:#a0b0b5}.file-report[aria-pressed=true]{background:#274a42}
+.candidates{position:absolute;inset:24% 3% 4%;display:flex;justify-content:center;align-content:center;flex-wrap:wrap;gap:1px 3px;line-height:1;font-size:clamp(.68rem,2.7vw,1.1rem)}
+.tools button,.menu-actions button{min-height:44px}.token[aria-pressed=true]{background:#243c44}.tools button[aria-pressed=true]{background:#264640}
+@media(max-width:760px){.orbital{right:7%;width:68px;height:68px}header{padding:14px 12px}.difficulty-grid{grid-template-columns:1fr 1fr;gap:8px}.difficulty-card{padding:12px;min-height:150px}.difficulty-top{font-size:1rem}.bars{gap:2px}.difficulty-card .meta{font-size:.68rem}.panel-head h2{letter-spacing:.035em}.cell-label{font-size:clamp(.52rem,1.8vw,.72rem)}.obstacle .glyph{font-size:clamp(1.2rem,5vw,1.7rem)}.focus-panel li{line-height:1.45}.map-heading{margin-top:.65rem}.tools{display:grid;grid-template-columns:repeat(3,1fr)}.tools button{padding:5px}.seedbar input{width:100px}}
+@media(max-width:370px){.orbital{right:4%;width:48px;height:48px}.bars{display:none}}
