@@ -1,4 +1,4 @@
-# PARADOX — Prototype 0.2.1
+# PARADOX — Prototype 0.2.2
 
 Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (conservé dans l'historique Git).
 
@@ -13,6 +13,8 @@ En local, depuis le dépôt cloné : `python -m http.server 8000`, puis http://l
 L’accueil propose Initiation (mission fixe), Facile (4×4), Intermédiaire (5×5) et Expert (6×6). Les trois derniers modes génèrent une mission à chaque lancement. Le bouton Changer de difficulté ouvre le menu sans effacer la mission ; Reprendre revient à la partie en cours. Nouvelle mission et Mission suivante conservent la difficulté, sauf après l’initiation où elles passent en Facile. Un lien de mission V2 ouvre directement la grille correspondante.
 
 ## Mission
+
+En initiation, une sonde est déjà localisée et verrouillée ; un court guide indique comment exploiter son signal. Les missions procédurales V2 et leurs graines restent inchangées.
 
 Reconstituer la position des sondes d'une station, puis localiser une anomalie détectée par Alpha et Beta.
 
