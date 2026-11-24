@@ -25,5 +25,6 @@ function verify(B){
  for(let z=0;z<4;z++){const cells=B.zones.map((x,i)=>x===z?i:-1).filter(i=>i>=0),seen=new Set([cells[0]]);let changed=true;while(changed){changed=false;for(const p of cells)if(!seen.has(p)&&[...seen].some(q=>Math.abs(Math.floor(p/B.n)-Math.floor(q/B.n))+Math.abs(p%B.n-q%B.n)===1)){seen.add(p);changed=true}}assert.equal(seen.size,cells.length)}
 }
 verify(E.tutorial());
+const intro=E.tutorial();assert.equal(intro.clues.filter(c=>c.type==="fixed").length,1);assert.equal(intro.clues.find(c=>c.type==="fixed").p,intro.solution[0]);
 for(const level of Object.keys(E.presets)){let min=100,max=0;for(let i=0;i<60;i++){const seed="test-"+i,B=E.generate(seed,level);verify(B);assert.deepEqual(E.generate(seed,level),B);min=Math.min(min,B.clues.length);max=Math.max(max,B.clues.length)}console.log(level+": 60 missions validées, "+min+"–"+max+" rapports")}
 console.log("181 missions validées par deux solveurs.");
