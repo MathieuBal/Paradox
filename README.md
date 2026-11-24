@@ -1,4 +1,4 @@
-# PARADOX — Version 0.4.0
+# PARADOX — Version 0.5.0
 
 Jeu de déduction spatiale à missions procédurales. Toutes les sondes et l'anomalie sont à placer par le joueur ; aucun placement n'est fourni sur la carte.
 
@@ -48,3 +48,11 @@ Le moteur V3 change les missions procédurales associées aux graines V2. Les an
 - En intermédiaire et expert, les rapports peuvent comparer les distances à deux équipements, proposer deux zones ou relier deux sondes sur une diagonale. Le générateur exige au moins deux familles de rapports, trois en expert.
 - Le premier indice s’appuie sur les domaines restants du solveur. Le deuxième révèle la case déduite.
 - L’anomalie du jour utilise la date UTC comme graine commune. La génération procédurale tourne dans un Web Worker sur les navigateurs compatibles.
+
+## Campagne et modes V0.5
+
+Huit chapitres introduisent les indices et les six profils de faisceau. Le rapport d’Alpha décrit le signal de chaque mission. Beta conserve son émetteur directionnel. En mode relais, seule l’antenne prolonge le signal d’Alpha.
+
+Le menu propose également le marathon de trois difficultés, l’expert absolu (sans indice, vérification intermédiaire ni affichage des faisceaux), le défi quotidien et une mission personnalisée avec choix de grille et de signal. La graine, le profil de signal et le mode sont inclus dans le lien de partage.
+
+Le carnet local conserve les missions distinctes terminées, le temps de jeu actif, les indices demandés et les jours consécutifs de résolution (UTC). Une mission déjà enregistrée ne compte qu’une fois. Les sons sont facultatifs. Les tests indépendants couvrent aussi 225 grilles à faisceaux alternatifs.

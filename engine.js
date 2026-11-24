@@ -5,13 +5,46 @@ const range=n=>Array.from({length:n},(_,i)=>i), row=(p,n)=>Math.floor(p/n),col=(
 const dirs={N:[-1,0,"nord","↑"],S:[1,0,"sud","↓"],W:[0,-1,"ouest","←"],E:[0,1,"est","→"]};
 function rng(seed){let h=2166136261;for(const c of seed){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return()=>{h=(h+0x6D2B79F5)|0;let t=Math.imul(h^(h>>>15),1|h);t^=t+Math.imul(t^(t>>>7),61|t);return((t^(t>>>14))>>>0)/4294967296}}
 function shuffle(a,r){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-function ray(p,dir,board){const {n,objects}=board,[dr,dc]=dirs[dir],a=[];for(let k=1;k<=3;k++){const rr=row(p,n)+dr*k,cc=col(p,n)+dc*k,q=rr*n+cc;if(rr<0||rr>=n||cc<0||cc>=n||objects[q]!=null)break;a.push(q)}return a}
+function ray(p,dir,board,reach=3){const {n,objects}=board,[dr,dc]=dirs[dir],a=[];for(let k=1;k<=reach;k++){const rr=row(p,n)+dr*k,cc=col(p,n)+dc*k,q=rr*n+cc;if(rr<0||rr>=n||cc<0||cc>=n||objects[q]!=null)break;a.push(q)}return a}
+function beam(board,probe,p){
+ const dir=board.directions[probe];
+ if(probe===0&&board.signal==="radial")return Object.keys(dirs).flatMap(d=>ray(p,d,board,1));
+ if(probe===0&&board.signal==="diagonal"){
+   const cells=[];
+   for(const dr of [-1,1])for(const dc of [-1,1])for(let k=1;k<=3;k++){
+     const r=row(p,board.n)+k*dr,c=col(p,board.n)+k*dc,q=r*board.n+c;
+     if(r<0||c<0||r>=board.n||c>=board.n||board.objects[q]!=null)break;
+     cells.push(q);
+   }
+   return cells;
+ }
+ if(probe===0&&board.signal==="relay"){
+   const cells=ray(p,dir,board),antenna=board.objects.indexOf(0);
+   if(antenna>=0&&col(p,board.n)===col(antenna,board.n)&&
+      row(antenna,board.n)-row(p,board.n)===dirs[dir][0]*(cells.length+1)&&cells.length<3)
+     cells.push(...ray(antenna,dir,board));
+   return cells;
+ }
+ const long=probe===0&&board.signal==="long";
+ const cells=ray(p,dir,board,long?board.n-1:3);
+ if(probe===0&&board.signal==="double")return cells.concat(ray(p,{N:"S",S:"N",E:"W",W:"E"}[dir],board));
+ return cells;
+}
+function beamLabel(board,probe){
+ const [,,direction,arrow]=dirs[board.directions[probe]];
+ if(probe===0&&board.signal==="radial")return {arrow:"✛",text:"Alpha détecte les quatre cases directement voisines, à un pas horizontal ou vertical."};
+ if(probe===0&&board.signal==="diagonal")return {arrow:"⤧",text:"Alpha détecte sur ses quatre diagonales, jusqu’à trois cases. Chaque branche s’arrête au premier équipement."};
+ if(probe===0&&board.signal==="relay")return {arrow,text:"Alpha émet vers le "+direction+" sur trois cases. Si son faisceau atteint l’antenne, celle-ci le prolonge de trois cases dans la même direction."};
+ if(probe===0&&board.signal==="double")return {arrow:"↕",text:"Alpha balaie sa colonne vers le nord et le sud, jusqu’à trois cases de chaque côté."};
+ const reach=probe===0&&board.signal==="long"?"jusqu’au bord de la station":"jusqu’à trois cases";
+ return {arrow,text:names[probe]+" émet vers le "+direction+" "+arrow+", "+reach+". Le premier équipement arrête le faisceau."};
+}
 function offsetText(dr,dc){const part=(v,negative,positive)=>Math.abs(v)+(Math.abs(v)===1?" case ":" cases ")+(v<0?negative:positive);return [dr?part(dr,"au-dessus","en dessous"):null,dc?part(dc,"à gauche","à droite"):null].filter(Boolean).join(" et ")}
 function clueText(c){const a=names[c.a],b=names[c.b];switch(c.type){case"closer":return a+" était plus près de l’équipement "+objectNames[c.o]+" que de l’équipement "+objectNames[c.other]+" (en pas horizontaux et verticaux).";case"diagonal":return a+" et "+b+" occupaient la même diagonale.";case"zonePair":return a+" se trouvait dans l’une de ces deux zones : "+zones[c.z]+" ou "+zones[c.alt]+".";case"zone":return a+" se trouvait dans la zone « "+zones[c.z]+" ».";case"objectOffset":return a+" se trouvait "+offsetText(c.dr,c.dc)+" de l’équipement « "+objectNames[c.o]+" ».";case"near":return a+" occupait une case directement voisine de l’équipement « "+objectNames[c.o]+" » (haut, bas, gauche ou droite).";case"distance":return a+" était à "+c.d+" cases de « "+objectNames[c.o]+" » (distance horizontale + verticale).";case"axis":return a+" était sur la même "+(c.axis==="r"?"ligne":"colonne")+" que « "+objectNames[c.o]+" ».";case"edge":return a+(c.y?" se trouvait sur le bord de la carte.":" ne se trouvait sur aucun bord de la carte.");case"offset":return a+" se trouvait "+offsetText(c.dr,c.dc)+(b==="Epsilon"?" d’":" de ")+b+".";case"order":return a+" se trouvait "+(c.axis==="r"?(c.sign>0?"au sud":"au nord"):(c.sign>0?"à l’est":"à l’ouest"))+(b==="Epsilon"?" d’":" de ")+b+".";case"samezone":return a+" et "+b+" étaient dans "+(c.y?"la même zone":"des zones différentes")+".";case"fixed":return a+" se trouvait en "+coord(c.p,c.n)+"."}}
 function unary(c,p,B){const n=B.n,o=B.objects.indexOf(c.o);switch(c.type){case"closer":return dist(p,o,n)<dist(p,B.objects.indexOf(c.other),n);case"zonePair":return B.zones[p]===c.z||B.zones[p]===c.alt;case"zone":return B.zones[p]===c.z;case"objectOffset":return row(p,n)-row(o,n)===c.dr&&col(p,n)-col(o,n)===c.dc;case"near":return dist(p,o,n)===1;case"distance":return dist(p,o,n)===c.d;case"axis":return c.axis==="r"?row(p,n)===row(o,n):col(p,n)===col(o,n);case"edge":return (row(p,n)===0||row(p,n)===n-1||col(p,n)===0||col(p,n)===n-1)===c.y;case"fixed":return p===c.p;default:return true}}
 function binary(c,p,q,B){const n=B.n;switch(c.type){case"diagonal":return Math.abs(row(p,n)-row(q,n))===Math.abs(col(p,n)-col(q,n));case"offset":return row(p,n)-row(q,n)===c.dr&&col(p,n)-col(q,n)===c.dc;case"order":return Math.sign(c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;default:return true}}
 function context(B,convergence=true){
- const n=B.n,M=n+(convergence?1:0),free=range(n*n).filter(p=>B.objects[p]==null),unaryClues=range(M).map(i=>B.clues.filter(c=>c.a===i&&c.b==null)),pairs=range(M).map(()=>range(M).map(()=>[])),rays=convergence?[range(n*n).map(p=>new Set(ray(p,B.directions[0],B))),range(n*n).map(p=>new Set(ray(p,B.directions[1],B)))]:[];
+ const n=B.n,M=n+(convergence?1:0),free=range(n*n).filter(p=>B.objects[p]==null),unaryClues=range(M).map(i=>B.clues.filter(c=>c.a===i&&c.b==null)),pairs=range(M).map(()=>range(M).map(()=>[])),rays=convergence?[range(n*n).map(p=>new Set(beam(B,0,p))),range(n*n).map(p=>new Set(beam(B,1,p)))]:[];
  for(const c of B.clues)if(c.b!=null){pairs[c.a][c.b].push([c,false]);pairs[c.b][c.a].push([c,true])}
  function compatible(i,p,j,q){if(p===q)return false;if(i<n&&j<n){if(row(p,n)===row(q,n)||col(p,n)===col(q,n))return false;for(const [c,rev] of pairs[i][j])if(!binary(c,rev?q:p,rev?p:q,B))return false}else if(convergence){const k=i===n?j:i,from=i===n?q:p,to=i===n?p:q;if(k<2&&!rays[k][from].has(to))return false}return true}
  const initial=range(M).map(i=>free.filter(p=>unaryClues[i].every(c=>unary(c,p,B))));
@@ -43,14 +76,24 @@ function solve(B,placements=[],trace=false,convergence=true){const C=context(B,c
 function count(B,convergence=true,limit=2){const C=context(B,convergence);let total=0;function visit(d){if(total>=limit)return;const s=propagate(C,d);if(!s.ok)return;if(s.complete){total++;return}let i=-1;for(let j=0;j<C.M;j++)if(s.domains[j].length>1&&(i<0||s.domains[j].length<s.domains[i].length))i=j;for(const p of s.domains[i]){const a=s.domains.slice();a[i]=[p];visit(a);if(total>=limit)return}}visit(C.initial);return total}
 function validate(B,p){if(p.length!==B.n+1||p.some(x=>!Number.isInteger(x)||x<0||x>=B.n*B.n))return false;const C=context(B);return p.every((q,i)=>C.initial[i].includes(q)&&p.every((v,j)=>i===j||C.compatible(i,q,j,v)))}
 function mapZones(n,r){const z=Array(n*n).fill(-1),corners=[0,n-1,n*(n-1),n*n-1],front=[];for(let k=0;k<4;k++){z[corners[k]]=k;front.push(corners[k])}while(front.length){const i=Math.floor(r()*front.length),p=front.splice(i,1)[0];for(const q of shuffle(range(n*n).filter(q=>dist(p,q,n)===1),r))if(z[q]<0){z[q]=z[p];front.push(q)}}return z}
-function generate(seed,level="normal",version=VERSION){
+function generate(seed,level="normal",version=VERSION,signal="standard"){
+ if(!["standard","double","long","radial","diagonal","relay"].includes(signal))throw Error("Signal inconnu");
  const P=presets[level];if(!P)throw Error("Difficulté inconnue");const n=P.n,r=rng(version+":"+level+":"+seed);
- for(let attempt=0;attempt<200;attempt++){
-  const rs=shuffle(range(n),r),cs=shuffle(range(n),r),s=rs.map((v,i)=>v*n+cs[i]),a=s[0],b=s[1],target=row(b,n)*n+col(a,n);
-  if(Math.abs(row(b,n)-row(a,n))>3||Math.abs(col(b,n)-col(a,n))>3)continue;
-  const directions=[row(b,n)>row(a,n)?"S":"N",col(a,n)>col(b,n)?"E":"W"],B={version,n,seed,level,zones:mapZones(n,r),objects:Array(n*n).fill(null),directions,clues:[],solution:s.concat(target)};
-  const protectedCells=new Set(s.concat(target,ray(a,directions[0],B),ray(b,directions[1],B)));
-  const available=shuffle(range(n*n).filter(p=>!protectedCells.has(p)),r);if(available.length<P.objects)continue;
+ for(let attempt=0;attempt<(signal==="standard"?200:1000);attempt++){
+  const rs=shuffle(range(n),r),cs=shuffle(range(n),r),s=rs.map((v,i)=>v*n+cs[i]),a=s[0],b=s[1];
+  const gap=Math.abs(row(b,n)-row(a,n));
+  let target=row(b,n)*n+col(a,n);
+  if(signal==="radial"&&gap!==1)continue;
+  if(signal==="relay"&&(gap<2||gap>6))continue;
+  if(signal==="diagonal"){const cs=[col(a,n)-gap,col(a,n)+gap].filter(c=>c>=0&&c<n&&c!==col(b,n)&&Math.abs(c-col(b,n))<=3);if(!cs.length)continue;target=row(b,n)*n+cs[Math.floor(r()*cs.length)]}
+  if((!["long","relay"].includes(signal)&&gap>3)||Math.abs(col(b,n)-col(target,n))>3)continue;
+  const directions=[row(b,n)>row(a,n)?"S":"N",col(target,n)>col(b,n)?"E":"W"],B={version,n,seed,level,zones:mapZones(n,r),objects:Array(n*n).fill(null),directions,clues:[],solution:s.concat(target)};
+  if(signal!=="standard")B.signal=signal;
+  let antenna;
+  if(signal==="relay"){antenna=a+Math.sign(row(b,n)-row(a,n))*n*Math.min(3,gap-1);B.objects[antenna]=0}
+  const protectedCells=new Set(s.concat(target,beam(B,0,a),beam(B,1,b)));
+  if(antenna!=null)protectedCells.add(antenna);
+  const available=shuffle(range(n*n).filter(p=>!protectedCells.has(p)),r);if(antenna!=null)available.unshift(antenna);if(available.length<P.objects)continue;
   for(let i=0;i<P.objects;i++)B.objects[available[i]]=i;
   let pool=[];for(let i=0;i<n;i++){
     const p=s[i];pool.push({type:"zone",a:i,z:B.zones[p]},{type:"edge",a:i,y:row(p,n)===0||row(p,n)===n-1||col(p,n)===0||col(p,n)===n-1});
@@ -110,6 +153,6 @@ function explain(B,placements){
  return {i:step.i,p:step.remaining[0],why:"Pour "+label(step.i)+", il restait "+choices+". "+step.why+"."};
 }
 function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"objectOffset",a:0,o:0,dr:1,dc:-1},{type:"zone",a:1,z:3},{type:"objectOffset",a:2,o:0,dr:0,dc:1},{type:"offset",a:3,b:4,dr:1,dc:1},{type:"zone",a:4,z:2},{type:"near",a:3,o:4}],solution:[7,13,4,21,15,12]}}
-return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,clueText,explain,solve,count,validate,generate,tutorial,basic,profile,anchored};
+return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,beam,beamLabel,clueText,explain,solve,count,validate,generate,tutorial,basic,profile,anchored};
 })();
 if(typeof module!=="undefined")module.exports=Paradox;

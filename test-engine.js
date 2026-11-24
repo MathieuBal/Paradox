@@ -9,10 +9,27 @@ function brute(B, convergence=true, limit=2) {
   if(p<0||(c.b!=null&&q<0))return true;
   switch(c.type){case"diagonal":return Math.abs(R(p)-R(q))===Math.abs(C(p)-C(q));case"zonePair":return [c.z,c.alt].includes(B.zones[p]);case"closer":return D(p,o)<D(p,B.objects.indexOf(c.other));case"zone":return B.zones[p]===c.z;case"edge":return (R(p)===0||R(p)===n-1||C(p)===0||C(p)===n-1)===c.y;case"objectOffset":return R(p)-R(o)===c.dr&&C(p)-C(o)===c.dc;case"near":return D(p,o)===1;case"distance":return D(p,o)===c.d;case"axis":return c.axis==="r"?R(p)===R(o):C(p)===C(o);case"offset":return R(p)-R(q)===c.dr&&C(p)-C(q)===c.dc;case"order":return Math.sign(c.axis==="r"?R(p)-R(q):C(p)-C(q))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;case"fixed":return p===c.p;default:throw Error(c.type)}
  }
- function signal(p,dir,t){const delta={N:[-1,0],S:[1,0],W:[0,-1],E:[0,1]}[dir];for(let k=1;k<=3;k++){const r=R(p)+delta[0]*k,c=C(p)+delta[1]*k;if(r<0||r>=n||c<0||c>=n||B.objects[r*n+c]!=null)return false;if(r*n+c===t)return true}return false}
+ function signal(p,dir,t,reach=3){const delta={N:[-1,0],S:[1,0],W:[0,-1],E:[0,1]}[dir];for(let k=1;k<=reach;k++){const r=R(p)+delta[0]*k,c=C(p)+delta[1]*k;if(r<0||r>=n||c<0||c>=n||B.objects[r*n+c]!=null)return false;if(r*n+c===t)return true}return false}
+ function alpha(t){
+  const p=v[0],dr=R(t)-R(p),dc=C(t)-C(p),dir=B.directions[0];
+  if(B.signal==="radial")return D(p,t)===1;
+  if(B.signal==="diagonal"){
+   if(!dr||Math.abs(dr)!==Math.abs(dc)||Math.abs(dr)>3)return false;
+   for(let k=1;k<Math.abs(dr);k++)if(B.objects[(R(p)+k*Math.sign(dr))*n+C(p)+k*Math.sign(dc)]!=null)return false;
+   return true;
+  }
+  if(B.signal==="relay"){
+   const antenna=B.objects.indexOf(0),distance=R(antenna)-R(p);
+   if(C(antenna)===C(p)&&Math.sign(distance)===(dir==="N"?-1:1)&&Math.abs(distance)<=3){
+    const clear=Array.from({length:Math.abs(distance)-1},(_,i)=>p+n*Math.sign(distance)*(i+1)).every(x=>B.objects[x]==null);
+    if(clear&&signal(antenna,dir,t))return true;
+   }
+  }
+  return signal(p,dir,t,B.signal==="long"?n-1:3)||(B.signal==="double"&&signal(p,dir==="N"?"S":"N",t));
+ }
  function visit(i,rows,cols){
   if(found>=limit)return;
-  if(i===n){if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&signal(v[0],B.directions[0],t)&&signal(v[1],B.directions[1],t)){found++;if(found>=limit)return}return}
+  if(i===n){if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&alpha(t)&&signal(v[1],B.directions[1],t)){found++;if(found>=limit)return}return}
   for(const p of all){const r=1<<R(p),c=1<<C(p);if((r&rows)||(c&cols))continue;v[i]=p;if(B.clues.every(clue))visit(i+1,rows|r,cols|c);v[i]=-1;if(found>=limit)return}
  }
  visit(0,0,0);return found;
@@ -28,3 +45,6 @@ verify(E.tutorial());
 const intro=E.tutorial();assert(intro.clues.some(c=>c.type==="zone"&&c.a===4&&c.z===2));assert(intro.clues.some(c=>c.type==="objectOffset"&&c.a===0));
 for(const level of Object.keys(E.presets)){let min=100,max=0;for(let i=0;i<100;i++){const seed=i<60?"test-"+i:"v3-audit-"+i,B=E.generate(seed,level);verify(B);assert.deepEqual(E.generate(seed,level),B);min=Math.min(min,B.clues.length);max=Math.max(max,B.clues.length)}console.log(level+": 100 missions validées, "+min+"–"+max+" rapports")}
 console.log("301 missions validées par deux solveurs.");
+
+for(const signal of ["long","double","radial","diagonal","relay"])for(const level of Object.keys(E.presets))for(let i=0;i<15;i++)verify(E.generate("variant-"+i,level,E.VERSION,signal));
+console.log("225 missions à signal alternatif validées.");
