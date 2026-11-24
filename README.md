@@ -1,44 +1,39 @@
-# PARADOX
+# PARADOX — Prototype 0.2
 
-Jeu de déduction à deux époques. Prototype 0.1, moteur procédural V1.
+Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (conservé dans l'historique Git).
 
 ## Jouer
 
-Aucune dépendance ni base de données. Depuis le dépôt cloné :
+Site GitHub Pages : https://mathieubal.github.io/Paradox/
 
-```sh
-python -m http.server 8000
-```
+En local, depuis le dépôt cloné : `python -m http.server 8000`, puis http://localhost:8000. Aucun service externe ni dépendance.
 
-Ouvrir http://localhost:8000. Le site peut également être hébergé sur GitHub Pages (branche main, racine), si activé dans les paramètres du dépôt.
+## Mission
 
-## Règles
+Reconstituer la position des sondes d'une station, puis localiser une anomalie détectée par Alpha et Beta.
 
-- Chaque symbole apparaît exactement une fois par ligne et colonne, dans chaque époque.
-- Les rangs 1 à N sont affichés sur la palette.
-- Un signe à la même coordonnée dans les deux grilles compare toujours le passé au futur : < (croissance), > (décroissance), = (identité). Sans signe, aucune relation n'est imposée.
-- Les indices fixes ne peuvent pas être modifiés.
-- Compléter les deux grilles sans contradiction.
+- Une seule sonde par ligne et colonne.
+- Les équipements interdisent le placement et bloquent les signaux.
+- Alpha et Beta détectent dans une direction fixe sur trois cases au maximum.
+- Les limites de zones et les autres sondes ne bloquent pas les signaux.
+- L'anomalie est sur une case libre à l'intersection des deux signaux ; elle ne compte pas comme une sonde.
+- Les rapports décrivent des zones, des distances, des équipements et des relations spatiales.
+- Les exclusions sont des annotations manuelles ; les signaux affichés proviennent des placements du joueur.
 
-## Génération
+## Génération V2
 
-Deux carrés latins permutés servent de solutions initiales. Le moteur retire des indices puis des liaisons en ne conservant que les configurations résolues par propagation logique (élimination des valeurs fixées, singleton caché, filtrage des relations temporelles). Ces déductions étant nécessaires, une solution intégralement obtenue ainsi est unique. Une recherche exacte, limitée à deux solutions, vérifie en outre que chaque époque seule reste ambiguë. La graine et la difficulté déterminent le niveau dans cette version du moteur. Une nouvelle graine permet de renouveler les parties ; des grilles équivalentes ou répétées restent possibles. Si une graine ne produit pas de niveau après 40 tentatives, la génération s'arrête avec un message d'erreur.
+La graine et le niveau fixent la carte, les positions, les équipements, les directions et les rapports. Les quatre zones sont contiguës. Le moteur construit une configuration valide, génère des rapports vrais puis retire les rapports non nécessaires à sa résolution logique. Il rejette les niveaux si la convergence n'est pas indispensable : sans elle, au moins deux configurations des sondes restent possibles.
+
+Le solveur propage les contraintes sur les domaines de positions (compatibilité par paires, unicité des lignes et colonnes, rapports et signaux). Le générateur conserve uniquement les niveaux entièrement résolubles par cette propagation, sans recherche par hypothèse. Le comptage exact explore les domaines résiduels pour tester l'unicité. Après 100 essais sans réussite, le générateur renvoie une erreur explicite ; une autre graine peut être essayée. Des répétitions ou grilles équivalentes restent possibles.
+
+Les difficultés sont des préréglages de taille et d'aide, pas encore des mesures validées de difficulté humaine. Les liens incluent la version du moteur ; les anciennes graines V1 ne sont pas compatibles avec V2.
 
 ## Tests
 
-```sh
-node test-engine.js
-```
+`node test-engine.js`
 
-180 cas déterministes répartis sur 4×4, 5×5 et 6×6 : solution unique, ambiguïté de chaque époque prise séparément, résolution déductive, reproductibilité et contradiction élémentaire.
+181 missions : initiation + 60 par difficulté. Deux algorithmes distincts vérifient l'unicité et la nécessité de la convergence. Le test vérifie aussi la résolution par propagation, la reproductibilité, les placements incorrects et la contiguïté des zones.
 
-## Fichiers
+## Roadmap
 
-- engine.js : générateur, solveur logique, comptage exact des solutions.
-- app.js : interactions, annotations, annulation, indices, vérification et partage.
-- index.html : interface responsive, sans dépendance.
-- test-engine.js : tests de régression.
-
-## Prochaines itérations
-
-Tests utilisateurs et navigateur, calibrage empirique de la difficulté, meilleure représentation des relations temporelles, sauvegarde de partie, défi quotidien. Les difficultés actuelles sont des préréglages de taille et de densité et non une mesure validée du temps de résolution.
+Tests humains et navigateur réel ; ergonomie mobile et prise en main ; calibrage de la difficulté ; enrichissement des indices ; sauvegarde ; réflexion et relais de signaux après validation du gameplay de base.
