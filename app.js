@@ -7,14 +7,17 @@ function say(s,kind=""){const el=$("status");el.textContent=s;el.dataset.kind=ki
 function newSeed(){const a=new Uint32Array(2);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(36)).join("-")}
 function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";if(open){$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
 function start(level,seed){
- try{const p=level==="tutorial"?E.tutorial():E.generate(seed,level);board=p;positions=Array(p.n+1).fill(-1);marks=Array(p.n+1).fill(0n);history=[];active=0;mode=false;signals=true;done=false;
+ try{const p=level==="tutorial"?E.tutorial():E.generate(seed,level);board=p;positions=initialPositions();marks=Array(p.n+1).fill(0n);history=[];active=firstFree();mode=false;signals=true;done=false;
  $("seed").value=p.seed;$("current-difficulty").textContent=labels[level];const url=new URL(location.href);url.searchParams.set("v",E.VERSION);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);window.history.replaceState(null,"",url);render();menu(false);say("Analyse les rapports, puis localise les sondes et l’anomalie.");}
  catch(e){if(!$("mission-menu").hidden)$("menu-error").textContent=e.message;else say(e.message,"error")}
 }
+function fixed(i){return board.clues.some(c=>c.type==="fixed"&&c.a===i)}
+function initialPositions(){const p=Array(board.n+1).fill(-1);for(const c of board.clues)if(c.type==="fixed")p[c.a]=c.p;return p}
+function firstFree(){return positions.findIndex(p=>p<0)}
 function snapshot(){history.push({positions:positions.slice(),marks:marks.slice(),active});if(history.length>200)history.shift()}
 function select(i){active=i;render()}
 function place(p){
- if(!board||done)return;if(board.objects[p]!=null){say("Un équipement occupe cette case.","error");return}
+ if(!board||done)return;if(fixed(active)){say("Cette sonde est déjà localisée et verrouillée. Choisis une autre entité.");return}if(board.objects[p]!=null){say("Un équipement occupe cette case.","error");return}
  if(mode){snapshot();marks[active]^=1n<<BigInt(p);say("Annotation mise à jour.");render();return}
  if(positions.some((v,i)=>v===p&&i!==active)){say("Une autre entité occupe cette case.","error");return}
  snapshot();positions[active]=positions[active]===p?-1:p;marks[active]=0n;say("");render();
@@ -27,26 +30,26 @@ function render(){
   const r=Math.floor(p/n),c=p%n,z=board.zones[p],o=board.objects[p],i=positions.indexOf(p),b=document.createElement("button");b.type="button";b.className="cell";b.dataset.cell=p;
   b.style.setProperty("--zone",zoneColors[z]);b.style.setProperty("--token",i>=0?color(i):color(active));
   if(c===0||board.zones[p-1]!==z)b.classList.add("wall-left");if(c===n-1||board.zones[p+1]!==z)b.classList.add("wall-right");if(r===0||board.zones[p-n]!==z)b.classList.add("wall-top");if(r===n-1||board.zones[p+n]!==z)b.classList.add("wall-bottom");
-  if(i===active)b.classList.add("selected");if(selected>=0&&active<n&&i!==active&&(Math.floor(selected/n)===r||selected%n===c))b.classList.add("axis");
+  if(i>=0&&fixed(i))b.classList.add("confirmed");if(i===active)b.classList.add("selected");if(selected>=0&&active<n&&i!==active&&(Math.floor(selected/n)===r||selected%n===c))b.classList.add("axis");
   if(rays[0].includes(p))b.classList.add("ray-a");if(rays[1].includes(p))b.classList.add("ray-b");if(rays[0].includes(p)&&rays[1].includes(p))b.classList.add("cross");
   if(o!=null)b.classList.add("obstacle");if((marks[active]&(1n<<BigInt(p)))!==0n)b.classList.add("excluded");
   const tag=document.createElement("span");tag.className="coordinate";tag.textContent=coord(p);b.append(tag);
   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent=o!=null?objectIcons[o]:i>=0?indexSymbol(i):"";
   if(i>=0&&i<2){const arrow=document.createElement("sup");arrow.textContent=E.dirs[board.directions[i]][3];glyph.append(arrow)}b.append(glyph);
-  const subtitle=document.createElement("span");subtitle.className="cell-label";subtitle.textContent=o!=null?E.objectNames[o]:i>=0?name(i):"";b.append(subtitle);
-  b.setAttribute("aria-label",coord(p)+", "+E.zones[z]+(o!=null?", "+E.objectNames[o]:i>=0?", "+name(i):", libre"));b.setAttribute("aria-pressed",String(i===active));
+  const subtitle=document.createElement("span");subtitle.className="cell-label";subtitle.textContent=o!=null?E.objectNames[o]:i>=0?name(i)+(fixed(i)?" ✓":""):"";b.append(subtitle);
+  b.setAttribute("aria-label",coord(p)+", "+E.zones[z]+(o!=null?", "+E.objectNames[o]:i>=0?", "+name(i)+(fixed(i)?", position confirmée":""):", libre"));b.setAttribute("aria-pressed",String(i===active));
   b.onclick=()=>{place(p);grid.querySelector(`[data-cell="${p}"]`)?.focus({preventScroll:true})};grid.append(b);
  }
  const palette=$("palette");palette.replaceChildren();
- for(let i=0;i<=n;i++){const b=document.createElement("button");b.type="button";b.className="token";b.style.setProperty("--token",color(i));b.setAttribute("aria-pressed",String(i===active));b.innerHTML=`<strong>${indexSymbol(i)}${i<2?`<sup>${E.dirs[board.directions[i]][3]}</sup>`:""}</strong><span>${name(i)}</span><small>${coord(positions[i])}</small>`;b.onclick=()=>select(i);palette.append(b)}
+ for(let i=0;i<=n;i++){const b=document.createElement("button");b.type="button";b.className="token";b.style.setProperty("--token",color(i));b.setAttribute("aria-pressed",String(i===active));b.innerHTML=`<strong>${indexSymbol(i)}${i<2?`<sup>${E.dirs[board.directions[i]][3]}</sup>`:""}</strong><span>${name(i)}</span><small>${coord(positions[i])}${fixed(i)?" ✓":""}</small>`;b.onclick=()=>select(i);palette.append(b)}
  const reports=$("reports");reports.replaceChildren();
  function add(i,txt){const b=document.createElement("button");b.type="button";b.className="report";b.style.setProperty("--token",color(i));const badge=document.createElement("span");badge.className="report-icon";badge.textContent=indexSymbol(i);const t=document.createElement("span");t.textContent=txt;b.append(badge,t);b.onclick=()=>select(i);reports.append(b)}
  for(const c of board.clues)add(c.a,E.clueText(c));
  add(0,"Alpha détecte uniquement vers le "+E.dirs[board.directions[0]][2]+" ("+E.dirs[board.directions[0]][3]+").");
  add(1,"Beta détecte uniquement vers le "+E.dirs[board.directions[1]][2]+" ("+E.dirs[board.directions[1]][3]+").");
  add(n,"Alpha et Beta ont toutes les deux détecté l’unique anomalie.");
- $("selection").textContent=name(active)+" · "+coord(positions[active]);$("selection").style.color=color(active);
- $("notes").setAttribute("aria-pressed",String(mode));$("rays").setAttribute("aria-pressed",String(signals));$("undo").disabled=!history.length;$("erase").disabled=positions[active]<0||done;
+ $("starter").hidden=board.level!=="tutorial";$("selection").textContent=name(active)+" · "+coord(positions[active])+(fixed(active)?" · Confirmée":"");$("selection").style.color=color(active);
+ $("notes").setAttribute("aria-pressed",String(mode));$("rays").setAttribute("aria-pressed",String(signals));$("undo").disabled=!history.length;$("erase").disabled=positions[active]<0||fixed(active)||done;
  const count=positions.filter(p=>p>=0).length;$("progress").max=n+1;$("progress").value=count;$("progressLabel").textContent=`${count}/${n+1} entités localisées`;$("metadata").textContent=`${labels[board.level]} · ${n} × ${n} · ${board.clues.length} rapports de position`;
  $("validate").disabled=done;$("hint").disabled=done;$("check").disabled=done;$("win").hidden=!done;
 }
@@ -58,9 +61,9 @@ $("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis u
 $("share").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);say("Lien de la mission copié.")}catch{say("Copie l’adresse de cette page pour partager la mission.")}};
 $("notes").onclick=()=>{mode=!mode;render();say(mode?"Mode exclusion : marque les cases impossibles pour l’entité sélectionnée.":"Mode placement.")};
 $("rays").onclick=()=>{signals=!signals;render()};
-$("erase").onclick=()=>{snapshot();positions[active]=-1;say("");render()};
+$("erase").onclick=()=>{if(fixed(active)||done)return;snapshot();positions[active]=-1;say("");render()};
 $("undo").onclick=()=>{const prev=history.pop();if(!prev)return;positions=prev.positions;marks=prev.marks;active=prev.active;done=false;render();say("Dernière action annulée.")};
-$("reset").onclick=()=>{positions.fill(-1);marks.fill(0n);history=[];active=0;mode=false;done=false;render();say("Mission réinitialisée.")};
+$("reset").onclick=()=>{positions=initialPositions();marks.fill(0n);history=[];active=firstFree();mode=false;done=false;render();say("Mission réinitialisée.")};
 $("check").onclick=()=>{const result=E.solve(board,positions);say(result.ok?"Aucune contradiction détectée par les règles de déduction.":"Au moins un placement est incompatible avec les rapports ou les règles.",result.ok?"":"error")};
 $("hint").onclick=()=>{
  const s=E.solve(board,positions,true);if(!s.ok){say("Tes placements sont contradictoires. Vérifie ou annule une action.","error");return}
