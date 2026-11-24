@@ -5,10 +5,11 @@ let board,positions=[],marks=[],history=[],active=0,mode=false,signals=true,done
 const indexSymbol=i=>i===board.n?"✦":symbols[i],name=i=>i===board.n?"Anomalie":E.names[i],color=i=>i===board.n?"#f4f1e8":colors[i],coord=p=>E.coord(p,board.n);
 function say(s,kind=""){const el=$("status");el.textContent=s;el.dataset.kind=kind}
 function newSeed(){const a=new Uint32Array(2);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(36)).join("-")}
+function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";if(open){$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
 function start(level,seed){
  try{const p=level==="tutorial"?E.tutorial():E.generate(seed,level);board=p;positions=Array(p.n+1).fill(-1);marks=Array(p.n+1).fill(0n);history=[];active=0;mode=false;signals=true;done=false;
- $("difficulty").value=level;$("seed").value=p.seed;const url=new URL(location.href);url.searchParams.set("v",E.VERSION);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);window.history.replaceState(null,"",url);render();say("Analyse les rapports, puis localise les sondes et l’anomalie.");}
- catch(e){say(e.message,"error")}
+ $("seed").value=p.seed;$("current-difficulty").textContent=labels[level];const url=new URL(location.href);url.searchParams.set("v",E.VERSION);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);window.history.replaceState(null,"",url);render();menu(false);say("Analyse les rapports, puis localise les sondes et l’anomalie.");}
+ catch(e){if(!$("mission-menu").hidden)$("menu-error").textContent=e.message;else say(e.message,"error")}
 }
 function snapshot(){history.push({positions:positions.slice(),marks:marks.slice(),active});if(history.length>200)history.shift()}
 function select(i){active=i;render()}
@@ -49,10 +50,11 @@ function render(){
  const count=positions.filter(p=>p>=0).length;$("progress").max=n+1;$("progress").value=count;$("progressLabel").textContent=`${count}/${n+1} entités localisées`;$("metadata").textContent=`${labels[board.level]} · ${n} × ${n} · ${board.clues.length} rapports de position`;
  $("validate").disabled=done;$("hint").disabled=done;$("check").disabled=done;$("win").hidden=!done;
 }
-$("difficulty").onchange=()=>{const l=$("difficulty").value;start(l,l==="tutorial"?"incident-001":newSeed())};
-$("new").onclick=()=>{const l=$("difficulty").value==="tutorial"?"normal":$("difficulty").value;start(l,newSeed())};
-$("tutorial").onclick=()=>start("tutorial","incident-001");
-$("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis une graine.");return}start(seed==="incident-001"?"tutorial":$("difficulty").value==="tutorial"?"normal":$("difficulty").value,seed)};
+for(const l of ["tutorial","easy","normal","hard"]){$("choice-"+l).onclick=()=>start(l,l==="tutorial"?"incident-001":newSeed())}
+$("change-difficulty").onclick=()=>menu(true);
+$("resume").onclick=()=>menu(false);
+$("new").onclick=()=>start(board.level==="tutorial"?"easy":board.level,newSeed());
+$("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis une graine.");return}start(seed==="incident-001"?"tutorial":board.level==="tutorial"?"easy":board.level,seed)};
 $("share").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);say("Lien de la mission copié.")}catch{say("Copie l’adresse de cette page pour partager la mission.")}};
 $("notes").onclick=()=>{mode=!mode;render();say(mode?"Mode exclusion : marque les cases impossibles pour l’entité sélectionnée.":"Mode placement.")};
 $("rays").onclick=()=>{signals=!signals;render()};
@@ -67,6 +69,6 @@ $("hint").onclick=()=>{
 };
 $("validate").onclick=()=>{if(positions.includes(-1)){say("Localise toutes les sondes et l’anomalie avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}done=true;render();say("MISSION ACCOMPLIE — Anomalie localisée !","win")};
 $("next").onclick=()=>$("new").click();
-document.addEventListener("keydown",e=>{if(!board||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-7]$/.test(e.key)&&+e.key<=board.n+1){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
-const p=new URLSearchParams(location.search),l=p.get("level");if(p.get("v")===E.VERSION&&(l==="tutorial"||E.presets[l]))start(l,p.get("seed")||newSeed());else start("tutorial","incident-001");
+document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-7]$/.test(e.key)&&+e.key<=board.n+1){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
+const p=new URLSearchParams(location.search),l=p.get("level");if(p.get("v")===E.VERSION&&(l==="tutorial"||E.presets[l]))start(l,p.get("seed")||newSeed());else menu(true);
 })();
