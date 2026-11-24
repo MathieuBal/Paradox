@@ -1,4 +1,4 @@
-# PARADOX — Prototype 0.2
+# PARADOX — Prototype 0.2.1
 
 Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (conservé dans l'historique Git).
 
@@ -7,6 +7,10 @@ Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (
 Site GitHub Pages : https://mathieubal.github.io/Paradox/
 
 En local, depuis le dépôt cloné : `python -m http.server 8000`, puis http://localhost:8000. Aucun service externe ni dépendance.
+
+## Sélection de la difficulté
+
+L’accueil propose Initiation (mission fixe), Facile (4×4), Intermédiaire (5×5) et Expert (6×6). Les trois derniers modes génèrent une mission à chaque lancement. Le bouton Changer de difficulté ouvre le menu sans effacer la mission ; Reprendre revient à la partie en cours. Nouvelle mission et Mission suivante conservent la difficulté, sauf après l’initiation où elles passent en Facile. Un lien de mission V2 ouvre directement la grille correspondante.
 
 ## Mission
 
