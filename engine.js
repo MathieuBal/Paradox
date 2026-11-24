@@ -73,10 +73,10 @@ function generate(seed,level="normal"){
   if(level==="easy"){for(const c of extras){if(kept>=P.keep&&anchored(B)&&basic(B).complete)break;if(B.clues.includes(c))continue;B.clues.push(c);if(count(B,false)<2||basic(B).direct>directGoal+1)B.clues.pop();else kept++}}
   // Trim the easy report set again after adding teaching anchors, without losing its profile.
   if(level==="easy"&&basic(B).complete&&basic(B).direct>=2&&anchored(B)){
-    for(let i=B.clues.length-1;i>=0;i--){const old=B.clues.splice(i,1)[0];const q=basic(B);if(q.direct<2||!q.complete||!anchored(B)||!solve(B).complete)B.clues.splice(i,0,old)}
+    for(let i=B.clues.length-1;i>=0&&B.clues.length>4;i--){const old=B.clues.splice(i,1)[0];const q=basic(B);if(q.direct<2||!q.complete||!anchored(B)||!B.clues.some(c=>c.b!=null)||!solve(B).complete)B.clues.splice(i,0,old)}
   }
   const rating=profile(B);
-  if(level==="easy"&&(rating.direct<2||!rating.basicComplete||!anchored(B)||B.clues.length>9))continue;
+  if(level==="easy"&&(rating.direct<2||!rating.basicComplete||!anchored(B)||B.clues.length<4||B.clues.length>9||!B.clues.some(c=>c.b!=null)))continue;
   if(level==="normal"&&(rating.direct!==1||rating.basicComplete||!anchored(B)))continue;
   if(level==="hard"&&(rating.direct!==0||rating.basicComplete||!anchored(B)))continue;
   B.clues.sort((a,b)=>a.a-b.a);const proof=solve(B,[],true);if(!proof.ok||!proof.complete||!validate(B,B.solution)||proof.values.some((p,i)=>p!==B.solution[i]))continue;
