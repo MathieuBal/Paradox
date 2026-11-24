@@ -68,12 +68,13 @@ function launch([level,seed,options]){return start(level,seed,E.VERSION,null,opt
 document.addEventListener("visibilitychange",()=>{updateClock();persist()});
 window.addEventListener("pagehide",()=>{updateClock();persist()});
 function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
+let pinnedText=null;
 let candidates=[], filed=new Set(), generation=0, worker=null;
 const saveKey="paradox.mission.4";
 function persist(){
  if(!board)return;
  try{localStorage.setItem(saveKey,JSON.stringify({board,positions,marks:marks.map(String),candidates,
-   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded}));}catch{}
+   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded,pinnedText}));}catch{}
 }
 function readSave(){
  try{
@@ -104,7 +105,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  try{
   const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal));
   if(ticket!==generation)return;
-  run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
+  pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
   board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
   history=[];active=saved?.active??0;mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
@@ -121,7 +122,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  finally{if(ticket===generation){worker?.terminate();worker=null}}
 }
 function snapshot(){pendingHint=null;history.push({positions:positions.slice(),marks:marks.slice(),candidates:candidates.slice(),filed:[...filed],active});if(history.length>200)history.shift()}
-function select(i){if(active!==i)pendingHint=null;active=i;render()}
+function select(i){if(active!==i){pendingHint=null;pinnedText=null;}active=i;render()}
 function place(p){
  if(!board||done)return;if(board.objects[p]!=null){say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
  if(mode==="candidate"){
@@ -132,8 +133,45 @@ function place(p){
  const occupant=positions.indexOf(p);if(occupant>=0){select(occupant);say(name(occupant)+" sélectionnée. Touche une autre case pour la déplacer, ou Effacer.");return}
  snapshot();positions[active]=p;tone();say(name(active)+" placée en "+coord(p)+" (non vérifiée).");render();
 }
+function reportReferences(entry){
+ const refs=new Map(),c=entry.clue;
+ for(const z of [c?.z,c?.alt].filter(Number.isInteger)){
+   board.zones.forEach((zone,p)=>{if(zone===z)refs.set(p,E.zones[z])});
+ }
+ for(const o of [c?.o,c?.other].filter(Number.isInteger)){
+   const p=board.objects.indexOf(o);
+   if(p>=0)refs.set(p,E.objectNames[o]+" "+coord(p));
+ }
+ for(const i of [entry.i,entry.related,entry.other].filter(Number.isInteger)){
+   const p=positions[i];if(p>=0)refs.set(p,name(i)+" "+coord(p));
+ }
+ return refs;
+}
+function pin(entry,fromJournal){
+ pinnedText=entry.txt;pendingHint=null;
+ if(fromJournal)active=entry.i;
+ render();$("unpin").focus({preventScroll:true});
+ $("pinned").scrollIntoView({block:"nearest"});
+}
+$("unpin").onclick=()=>{pinnedText=null;render();$("focus-reports").querySelector("button")?.focus({preventScroll:true})};
 function render(){
  const n=board.n,N=n*n,grid=$("map");grid.replaceChildren();grid.style.setProperty("--n",n);
+ const entries=board.clues.map(c=>({clue:c,i:c.a,related:c.b,txt:E.clueText(c)}));
+ entries.push({i:0,txt:E.beamLabel(board,0).text},{i:1,txt:E.beamLabel(board,1).text},{i:n,related:0,other:1,txt:"L’anomalie se trouve sur une case libre où les deux signaux se croisent."});
+ entries.sort((a,b)=>a.i-b.i);
+ const relevant=c=>c.i===active||c.related===active||c.other===active;
+ const pinned=entries.find(e=>e.txt===pinnedText);
+ const references=pinned?reportReferences(pinned):new Map();
+ $("pinned").hidden=!pinned;
+ $("pinned-text").textContent=pinned?.txt||"";
+ $("pinned-refs").textContent=[...new Set(references.values())].join(" · ");
+ const switches=$("related-probes");switches.replaceChildren();
+ if(pinned)for(const i of [pinned.i,pinned.related,pinned.other].filter(Number.isInteger)){
+   const button=document.createElement("button");button.type="button";
+   button.textContent=name(i)+" · "+(positions[i]>=0?coord(positions[i]):"à placer");
+   button.setAttribute("aria-pressed",String(i===active));button.style.setProperty("--token",color(i));
+   button.onclick=()=>{active=i;pendingHint=null;render();$("unpin").focus({preventScroll:true})};switches.append(button);
+ }
  const rays=[0,1].map(i=>signals&&positions[i]>=0?E.beam(board,i,positions[i]):[]);
  const selected=positions[active];
  for(let p=0;p<N;p++){
@@ -164,20 +202,17 @@ function render(){
   if(candidates[p]&&i<0)b.setAttribute("aria-label",b.getAttribute("aria-label")+", hypothèses "+Array.from({length:n+1},(_,k)=>k).filter(k=>candidates[p]&(1<<k)).map(name).join(", "));
   if(o!=null)b.dataset.object=o;
   if(i>=0){b.dataset.probe=i===n?"anomaly":i;b.classList.add("with-probe")}
+  if(references.has(p)){b.classList.add("referenced");b.setAttribute("aria-label",b.getAttribute("aria-label")+", repère du rapport")}
   b.onclick=()=>{place(p);grid.querySelector(`[data-cell="${p}"]`)?.focus({preventScroll:true})};grid.append(b);
  }
  const palette=$("palette");palette.replaceChildren();
  for(let i=0;i<=n;i++){const b=document.createElement("button");b.type="button";b.className="token";if(positions[i]>=0)b.classList.add("placed");b.style.setProperty("--token",color(i));b.setAttribute("aria-pressed",String(i===active));b.innerHTML=`<strong>${indexSymbol(i)}${i<2?`<sup>${E.beamLabel(board,i).arrow}</sup>`:""}</strong><span>${name(i)}</span><small>${positions[i]<0?"À placer":coord(positions[i])}</small>`;b.onclick=()=>select(i);palette.append(b)}
  const reports=$("reports");reports.replaceChildren();
- const entries=board.clues.map(c=>({i:c.a,related:c.b,txt:E.clueText(c)}));
- entries.push({i:0,txt:E.beamLabel(board,0).text},{i:1,txt:E.beamLabel(board,1).text},{i:n,related:0,other:1,txt:"L’anomalie se trouve sur une case libre où les deux signaux se croisent."});
- entries.sort((a,b)=>a.i-b.i);
- const relevant=c=>c.i===active||c.related===active||c.other===active;
- for(const c of entries){const b=document.createElement("button");b.type="button";b.className="report";if(relevant(c))b.classList.add("report-active");b.style.setProperty("--token",color(c.i));const badge=document.createElement("span");badge.className="report-icon";badge.textContent=indexSymbol(c.i);const t=document.createElement("span");t.textContent=c.txt;b.append(badge,t);b.onclick=()=>{select(c.i);if(window.matchMedia?.("(max-width:760px)").matches)$("workbench").scrollIntoView({block:"start",behavior:"auto"})};const line=document.createElement("div");line.className="report-line";line.classList.toggle("filed",filed.has(c.txt));
+ for(const c of entries){const b=document.createElement("button");b.type="button";b.className="report";if(relevant(c))b.classList.add("report-active");b.style.setProperty("--token",color(c.i));const badge=document.createElement("span");badge.className="report-icon";badge.textContent=indexSymbol(c.i);const t=document.createElement("span");t.textContent=c.txt;b.append(badge,t);b.onclick=()=>pin(c,true);const line=document.createElement("div");line.className="report-line";line.classList.toggle("filed",filed.has(c.txt));
  const tick=document.createElement("button");tick.className="file-report";tick.textContent="✓";tick.setAttribute("aria-pressed",String(filed.has(c.txt)));tick.setAttribute("aria-label","Marquer comme exploité : "+c.txt);
  tick.onclick=()=>{snapshot();if(filed.has(c.txt))filed.delete(c.txt);else filed.add(c.txt);render();$("reports").querySelectorAll(".file-report")[entries.indexOf(c)].focus({preventScroll:true})};
  line.append(b,tick);reports.append(line)}
- const focus=$("focus-reports");focus.replaceChildren();for(const c of entries.filter(relevant)){const li=document.createElement("li");li.textContent=c.txt;li.classList.toggle("filed",filed.has(c.txt));focus.append(li)}if(!focus.children.length){const li=document.createElement("li");li.textContent="Aucun rapport direct : recoupe les autres rapports et les lignes et colonnes.";focus.append(li)}
+ const focus=$("focus-reports");focus.replaceChildren();for(const c of entries.filter(relevant)){const li=document.createElement("li");const link=document.createElement("button");link.type="button";link.className="focus-clue";link.textContent=c.txt;link.onclick=()=>pin(c,false);li.append(link);li.classList.toggle("filed",filed.has(c.txt));focus.append(li)}if(!focus.children.length){const li=document.createElement("li");li.textContent="Aucun rapport direct : recoupe les autres rapports et les lignes et colonnes.";focus.append(li)}
  $("focus-title").textContent="Rapports · "+name(active);$("focus-title").style.color=color(active);
  $("starter").hidden=board.level!=="tutorial";$("selection").textContent=name(active)+" · "+(positions[active]<0?"à placer":coord(positions[active]));$("selection").style.color=color(active);
  $("notes").setAttribute("aria-pressed",String(mode===true));$("rays").setAttribute("aria-pressed",String(signals));$("undo").disabled=!history.length;$("erase").disabled=positions[active]<0||done;
@@ -216,8 +251,8 @@ $("candidate").onclick=()=>{mode=mode==="candidate"?false:"candidate";render();s
 $("rays").onclick=()=>{signals=!signals;render()};
 $("erase").onclick=()=>{if(done||positions[active]<0)return;snapshot();positions[active]=-1;say("");render()};
 $("undo").onclick=()=>{const prev=history.pop();if(!prev)return;pendingHint=null;positions=prev.positions;marks=prev.marks;candidates=prev.candidates;filed=new Set(prev.filed);active=prev.active;done=false;updateClock();render();say("Dernière action annulée.")};
-$("reset").onclick=()=>{snapshot();positions=Array(board.n+1).fill(-1);marks.fill(0n);candidates.fill(0);filed.clear();active=0;mode=false;done=false;pendingHint=null;updateClock();render();say("Mission réinitialisée.")};
-$("check").onclick=()=>{const result=E.solve(board,positions);say(result.ok?"Aucune contradiction détectée par les règles de déduction.":"Au moins un placement est incompatible avec les rapports ou les règles.",result.ok?"":"error")};
+$("reset").onclick=()=>{snapshot();pinnedText=null;positions=Array(board.n+1).fill(-1);marks.fill(0n);candidates.fill(0);filed.clear();active=0;mode=false;done=false;pendingHint=null;updateClock();render();say("Mission réinitialisée.")};
+$("check").onclick=()=>{const issue=E.conflict(board,positions);if(issue){say(issue,"error");return}const result=E.solve(board,positions);say(result.ok?"Aucune contradiction détectée par les règles de déduction.":"Au moins un placement est incompatible avec les rapports ou les règles.",result.ok?"":"error")};
 $("hint").onclick=()=>{
  const s=E.solve(board,positions,true);if(!s.ok){pendingHint=null;say("Tes placements sont contradictoires. Vérifie les rapports et les lignes/colonnes.","error");return}
  if(pendingHint){const h=pendingHint;pendingHint=null;active=h.i;render();say(name(h.i)+" : "+coord(h.p)+". "+h.why);return}

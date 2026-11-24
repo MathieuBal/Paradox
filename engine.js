@@ -74,6 +74,22 @@ function profile(B){const b=basic(B),proof=solve(B,[],true);return{direct:b.dire
 function anchored(B){const reachable=new Set(B.clues.filter(c=>c.b==null).map(c=>c.a));let changed=true;while(changed){changed=false;for(const c of B.clues)if(c.b!=null&&(reachable.has(c.a)||reachable.has(c.b))){for(const i of [c.a,c.b])if(!reachable.has(i)){reachable.add(i);changed=true}}}return B.clues.every(c=>c.b==null||reachable.has(c.a))}
 function solve(B,placements=[],trace=false,convergence=true){const C=context(B,convergence),d=C.initial.map((a,i)=>placements[i]>=0?a.filter(p=>p===placements[i]):a);return propagate(C,d,trace)}
 function count(B,convergence=true,limit=2){const C=context(B,convergence);let total=0;function visit(d){if(total>=limit)return;const s=propagate(C,d);if(!s.ok)return;if(s.complete){total++;return}let i=-1;for(let j=0;j<C.M;j++)if(s.domains[j].length>1&&(i<0||s.domains[j].length<s.domains[i].length))i=j;for(const p of s.domains[i]){const a=s.domains.slice();a[i]=[p];visit(a);if(total>=limit)return}}visit(C.initial);return total}
+function conflict(B,positions){
+ for(let i=0;i<B.n;i++)for(let j=0;j<i;j++){
+  const p=positions[i],q=positions[j];if(p<0||q<0)continue;
+  const axis=row(p,B.n)===row(q,B.n)?"ligne":col(p,B.n)===col(q,B.n)?"colonne":null;
+  if(axis)return names[j]+" ("+coord(q,B.n)+") et "+names[i]+" ("+coord(p,B.n)+") occupent la même "+axis+".";
+ }
+ for(const c of B.clues){
+  const p=positions[c.a],q=positions[c.b];
+  if(p>=0&&(c.b==null?!unary(c,p,B):q>=0&&!binary(c,p,q,B)))
+   return "Ce placement contredit le rapport suivant. "+clueText(c);
+ }
+ const target=positions[B.n];
+ if(target>=0)for(let i=0;i<2;i++)if(positions[i]>=0&&!beam(B,i,positions[i]).includes(target))
+  return "Depuis "+coord(positions[i],B.n)+", le faisceau de "+names[i]+" n’atteint pas l’anomalie proposée en "+coord(target,B.n)+".";
+ return null;
+}
 function validate(B,p){if(p.length!==B.n+1||p.some(x=>!Number.isInteger(x)||x<0||x>=B.n*B.n))return false;const C=context(B);return p.every((q,i)=>C.initial[i].includes(q)&&p.every((v,j)=>i===j||C.compatible(i,q,j,v)))}
 function mapZones(n,r){const z=Array(n*n).fill(-1),corners=[0,n-1,n*(n-1),n*n-1],front=[];for(let k=0;k<4;k++){z[corners[k]]=k;front.push(corners[k])}while(front.length){const i=Math.floor(r()*front.length),p=front.splice(i,1)[0];for(const q of shuffle(range(n*n).filter(q=>dist(p,q,n)===1),r))if(z[q]<0){z[q]=z[p];front.push(q)}}return z}
 function generate(seed,level="normal",version=VERSION,signal="standard"){
@@ -153,6 +169,6 @@ function explain(B,placements){
  return {i:step.i,p:step.remaining[0],why:"Pour "+label(step.i)+", il restait "+choices+". "+step.why+"."};
 }
 function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"objectOffset",a:0,o:0,dr:1,dc:-1},{type:"zone",a:1,z:3},{type:"objectOffset",a:2,o:0,dr:0,dc:1},{type:"offset",a:3,b:4,dr:1,dc:1},{type:"zone",a:4,z:2},{type:"near",a:3,o:4}],solution:[7,13,4,21,15,12]}}
-return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,beam,beamLabel,clueText,explain,solve,count,validate,generate,tutorial,basic,profile,anchored};
+return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,beam,beamLabel,clueText,explain,solve,count,conflict,validate,generate,tutorial,basic,profile,anchored};
 })();
 if(typeof module!=="undefined")module.exports=Paradox;
