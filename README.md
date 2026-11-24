@@ -1,4 +1,4 @@
-# PARADOX — Prototype 0.2.2
+# PARADOX — Prototype 0.2.3
 
 Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (conservé dans l'historique Git).
 
@@ -14,7 +14,7 @@ L’accueil propose Initiation (mission fixe), Facile (4×4), Intermédiaire (5�
 
 ## Mission
 
-En initiation, une sonde est déjà localisée et verrouillée ; un court guide indique comment exploiter son signal. Les missions procédurales V2 et leurs graines restent inchangées.
+En initiation, une sonde est déjà localisée et verrouillée ; un court guide indique comment exploiter son signal. Un rapport situe aussi Epsilon dans la serre afin d’ancrer le couple Epsilon–Delta dans une zone de la carte. Les missions procédurales V2 et leurs graines restent inchangées.
 
 Reconstituer la position des sondes d'une station, puis localiser une anomalie détectée par Alpha et Beta.
 
