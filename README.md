@@ -1,45 +1,45 @@
-# PARADOX — Prototype 0.2.3
+# PARADOX — Prototype 0.3.0
 
-Jeu de déduction spatiale à énigmes procédurales. Refonte du prototype 0.1 (conservé dans l'historique Git).
+Jeu de déduction spatiale à missions procédurales. Toutes les sondes et l'anomalie sont à placer par le joueur ; aucun placement n'est fourni sur la carte.
 
 ## Jouer
 
-Site GitHub Pages : https://mathieubal.github.io/Paradox/
+https://mathieubal.github.io/Paradox/
 
 En local, depuis le dépôt cloné : `python -m http.server 8000`, puis http://localhost:8000. Aucun service externe ni dépendance.
 
-## Sélection de la difficulté
+## Règles
 
-L’accueil propose Initiation (mission fixe), Facile (4×4), Intermédiaire (5×5) et Expert (6×6). Les trois derniers modes génèrent une mission à chaque lancement. Le bouton Changer de difficulté ouvre le menu sans effacer la mission ; Reprendre revient à la partie en cours. Nouvelle mission et Mission suivante conservent la difficulté, sauf après l’initiation où elles passent en Facile. Un lien de mission V2 ouvre directement la grille correspondante.
+- Une sonde par ligne et par colonne ; l'anomalie ne compte pas comme une sonde.
+- Les équipements bloquent placements et signaux. Les zones colorées et les sondes ne bloquent pas les signaux.
+- Alpha et Beta détectent dans une direction fixe jusqu'à trois cases. L'anomalie occupe une case libre où les deux signaux se croisent.
+- Lire les rapports, sélectionner une entité, puis toucher une case libre. Toucher une entité déjà posée la sélectionne ; Effacer la retire.
+- Le rapport contextuel affiche aussi les indices où l'entité sélectionnée est mentionnée. Les exclusions sont des notes manuelles. Les signaux représentent les positions proposées, pas la solution.
+- Indice : première pression, orientation vers un raisonnement ; deuxième pression, révélation de la case. Aucun indice ne place automatiquement une entité.
 
-## Mission
+## Difficulté V3
 
-En initiation, une sonde est déjà localisée et verrouillée ; un court guide indique comment exploiter son signal. Un rapport situe aussi Epsilon dans la serre afin d’ancrer le couple Epsilon–Delta dans une zone de la carte. Les missions procédurales V2 et leurs graines restent inchangées.
+- Initiation : mission fixe 5×5, deux positions directement identifiables à partir des rapports, puis déductions simples. La convergence sert à localiser l'anomalie finale.
+- Facile : 4×4, au moins deux positions directes, solution complète par élimination à partir de positions certaines et unicité de ligne/colonne.
+- Intermédiaire : 5×5, exactement une position directe ; la propagation élémentaire seule ne suffit pas.
+- Expert : 6×6, aucune position directe ; recoupement de domaines de possibilités nécessaire.
+- Un placement direct est une sonde dont les rapports géographiques, sans autres placements ni convergence, ne laissent qu'une case libre.
+- Les rapports relationnels sont reliés à au moins un ancrage géographique dans leur composante. Les rapports sont déterministes et décrivent zones, voisinage, distances, décalages et relations entre sondes.
 
-Reconstituer la position des sondes d'une station, puis localiser une anomalie détectée par Alpha et Beta.
+La difficulté reste une estimation algorithmique ; elle devra être calibrée avec des joueurs.
 
-- Une seule sonde par ligne et colonne.
-- Les équipements interdisent le placement et bloquent les signaux.
-- Alpha et Beta détectent dans une direction fixe sur trois cases au maximum.
-- Les limites de zones et les autres sondes ne bloquent pas les signaux.
-- L'anomalie est sur une case libre à l'intersection des deux signaux ; elle ne compte pas comme une sonde.
-- Les rapports décrivent des zones, des distances, des équipements et des relations spatiales.
-- Les exclusions sont des annotations manuelles ; les signaux affichés proviennent des placements du joueur.
+## Génération et validation
 
-## Génération V2
+Le moteur part d'une configuration valide, génère des rapports vrais, supprime des rapports, puis ajoute des ancrages selon le niveau. Il rejette une mission si son profil logique ne correspond pas au mode demandé. Les quatre zones sont contiguës. Les missions procédurales exigent la convergence même pour résoudre les positions des sondes : sans cette règle, plusieurs configurations restent possibles. Toutes les missions doivent être entièrement résolubles par propagation de contraintes sans hypothèse. Le générateur effectue jusqu'à 200 essais ; en cas d'échec, une erreur explicite invite à changer de graine. Des grilles équivalentes restent possibles.
 
-La graine et le niveau fixent la carte, les positions, les équipements, les directions et les rapports. Les quatre zones sont contiguës. Le moteur construit une configuration valide, génère des rapports vrais puis retire les rapports non nécessaires à sa résolution logique. Il rejette les niveaux si la convergence n'est pas indispensable : sans elle, au moins deux configurations des sondes restent possibles.
-
-Le solveur propage les contraintes sur les domaines de positions (compatibilité par paires, unicité des lignes et colonnes, rapports et signaux). Le générateur conserve uniquement les niveaux entièrement résolubles par cette propagation, sans recherche par hypothèse. Le comptage exact explore les domaines résiduels pour tester l'unicité. Après 100 essais sans réussite, le générateur renvoie une erreur explicite ; une autre graine peut être essayée. Des répétitions ou grilles équivalentes restent possibles.
-
-Les difficultés sont des préréglages de taille et d'aide, pas encore des mesures validées de difficulté humaine. Les liens incluent la version du moteur ; les anciennes graines V1 ne sont pas compatibles avec V2.
+Le moteur V3 change les missions procédurales associées aux graines V2. Les anciens liens V2 procéduraux ouvrent le choix de mission avec un message ; l'ancien lien d'initiation ouvre l'initiation actualisée.
 
 ## Tests
 
 `node test-engine.js`
 
-181 missions : initiation + 60 par difficulté. Deux algorithmes distincts vérifient l'unicité et la nécessité de la convergence. Le test vérifie aussi la résolution par propagation, la reproductibilité, les placements incorrects et la contiguïté des zones.
+301 missions : initiation et 100 par difficulté. Deux solveurs indépendants vérifient l'unicité, la nécessité de la convergence pour les missions procédurales, la reproductibilité, la contiguïté, la validité et le profil logique. Le contrôle vérifie également l'absence de rapports de coordonnées fixes.
 
-## Roadmap
+## Suite
 
-Tests humains et navigateur réel ; ergonomie mobile et prise en main ; calibrage de la difficulté ; enrichissement des indices ; sauvegarde ; réflexion et relais de signaux après validation du gameplay de base.
+Tests visuels et utilisateurs sur mobile, ajustement des rapports, difficulté ressentie, sauvegarde et nouvelles mécaniques après validation du gameplay.
