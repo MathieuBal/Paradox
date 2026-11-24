@@ -57,7 +57,7 @@ function generate(seed,level="normal"){
  }
  throw Error("Cette graine n’a pas produit de niveau validé. Essaie une autre graine.");
 }
-function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"fixed",a:0,p:7,n:5},{type:"zone",a:1,z:3},{type:"near",a:2,o:0},{type:"offset",a:3,b:4,dr:1,dc:1}],solution:[7,13,4,21,15,12]}}
+function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"fixed",a:0,p:7,n:5},{type:"zone",a:1,z:3},{type:"near",a:2,o:0},{type:"offset",a:3,b:4,dr:1,dc:1},{type:"zone",a:4,z:2}],solution:[7,13,4,21,15,12]}}
 return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,clueText,solve,count,validate,generate,tutorial};
 })();
 if(typeof module!=="undefined")module.exports=Paradox;
