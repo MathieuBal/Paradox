@@ -42,6 +42,15 @@ function chapterIndex(){
 function renderJournal(){
  const entries=journal(),stage=chapterIndex();
  $("chapter-summary").textContent="Chapitre "+(stage+1)+" / "+Missions.chapters.length+" · "+Missions.chapters[stage].title;
+ const recovered=new Set(entries.filter(e=>e.kind==="campaign").map(e=>e.stage));
+ const archive=$("nacre-archive");archive.replaceChildren();
+ $("archive-count").textContent="Archives de Nacre · "+recovered.size+" / "+Missions.chapters.length;
+ Missions.chapters.forEach((chapter,i)=>{
+  if(!recovered.has(i))return;
+  const entry=document.createElement("details"),title=document.createElement("summary"),fragment=document.createElement("p");
+  title.textContent=(i+1)+". "+chapter.title;fragment.textContent=chapter.fragment;
+  entry.append(title,fragment);archive.append(entry);
+ });
  const days=new Set(entries.filter(x=>Number.isInteger(x.day)).map(x=>x.day));
  let day=Math.floor(Date.now()/86400000),streak=0;
  if(!days.has(day))day--;
@@ -106,7 +115,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
   const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal));
   if(ticket!==generation)return;
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
-  board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
+  $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
   history=[];active=saved?.active??0;mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
   done=!!saved?.done&&E.validate(p,positions);pendingHint=null;
@@ -175,7 +184,7 @@ function render(){
  const rays=[0,1].map(i=>signals&&positions[i]>=0?E.beam(board,i,positions[i]):[]);
  const selected=positions[active];
  for(let p=0;p<N;p++){
-  const r=Math.floor(p/n),c=p%n,z=board.zones[p],o=board.objects[p],i=positions.indexOf(p),b=document.createElement("button");b.type="button";b.className="cell";b.dataset.cell=p;
+  const r=Math.floor(p/n),c=p%n,z=board.zones[p],o=board.objects[p],i=positions.indexOf(p),b=document.createElement("button");b.type="button";b.className="cell";b.dataset.cell=p;b.dataset.zone=z;
   b.style.setProperty("--zone",zoneColors[z]);b.style.setProperty("--token",i>=0?color(i):color(active));
   if(c===0||board.zones[p-1]!==z)b.classList.add("wall-left");if(c===n-1||board.zones[p+1]!==z)b.classList.add("wall-right");if(r===0||board.zones[p-n]!==z)b.classList.add("wall-top");if(r===n-1||board.zones[p+n]!==z)b.classList.add("wall-bottom");
   if(i===active)b.classList.add("selected");if(selected>=0&&active<n&&i!==active&&(Math.floor(selected/n)===r||selected%n===c))b.classList.add("axis");
@@ -221,6 +230,10 @@ function render(){
  const absolute=run.kind==="absolute";
  for(const id of ["hint","check","rays"])$(id).hidden=absolute;
  const chapter=run.kind==="campaign"?Missions.chapters[run.stage]:null;
+ $("nacre-log").hidden=!chapter;
+ $("arrival").textContent=chapter?.arrival||"";
+ $("fragment").hidden=!(chapter&&done);
+ $("fragment").textContent=chapter&&done?chapter.fragment:"";
  const marathon=run.kind==="marathon";
  $("brief").hidden=run.kind==="classic";
  $("brief").textContent=chapter?"Chapitre "+(run.stage+1)+" · "+chapter.title+". "+chapter.brief:
