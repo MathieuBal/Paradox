@@ -88,7 +88,7 @@ function persist(){
 function readSave(){
  try{
   const x=JSON.parse(localStorage.getItem(saveKey)), b=x?.board;
-  if(!b||!["3","4"].includes(b.version)||!E.validate(b,b.solution))return null;
+  if(!b||!["3","4","5"].includes(b.version)||!E.validate(b,b.solution))return null;
   const validPos=p=>Number.isInteger(p)&&(p===-1||(p>=0&&p<b.n*b.n&&b.objects[p]==null));
   if(x.positions.length!==b.n+1||!x.positions.every(validPos)||x.marks.length!==b.n+1||
     !x.marks.every(v=>/^\d+$/.test(v))||x.candidates.length!==b.n*b.n||!x.candidates.every(Number.isInteger)||
@@ -99,7 +99,7 @@ function readSave(){
 function generateAsync(level,seed,version,signal){
  if(location.protocol==="file:"||!window.Worker)return E.generate(seed,level,version,signal);
  return new Promise((resolve,reject)=>{
-   worker=new Worker("generator.js?v=5");
+   worker=new Worker("generator.js?v=71");
    worker.onmessage=({data})=>data.error?reject(Error(data.error)):resolve(data.board);
    worker.onerror=()=>reject(Error("Génération interrompue. Relance la mission."));
    worker.postMessage({level,seed,version,signal});
@@ -118,7 +118,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
   $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
-  history=[];active=saved?.active??0;mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
+  history=[];active=saved?.active??(p.level==="tutorial"?0:E.startingProbe(p));mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
   done=!!saved?.done&&E.validate(p,positions);pendingHint=null;
   $("seed").value=p.seed;$("current-difficulty").textContent=labels[level];
   const url=new URL(location.href);url.searchParams.set("v",p.version);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);
@@ -179,7 +179,7 @@ function pin(entry,fromJournal){
 $("unpin").onclick=()=>{pinnedText=null;render();$("focus-reports").querySelector("button")?.focus({preventScroll:true})};
 function render(){
  const n=board.n,N=n*n,grid=$("map");grid.replaceChildren();grid.style.setProperty("--n",n);
- const entries=board.clues.map(c=>({clue:c,i:c.a,related:c.b,txt:E.clueText(c)}));
+ const entries=board.clues.map(c=>({clue:c,i:c.a,related:c.b,txt:E.clueText(c,board.version)}));
  entries.push({i:0,txt:E.beamLabel(board,0).text},{i:1,txt:E.beamLabel(board,1).text},{i:n,related:0,other:1,txt:"L’anomalie se trouve sur une case libre où les deux signaux se croisent."});
  entries.sort((a,b)=>a.i-b.i);
  const relevant=c=>c.i===active||c.related===active||c.other===active;
@@ -308,7 +308,7 @@ $("next").onclick=()=>{
 document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-7]$/.test(e.key)&&+e.key<=board.n+1){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
 const params=new URLSearchParams(location.search),level=params.get("level"),version=params.get("v"),seed=params.get("seed"),saved=readSave();
 if(!level&&saved)start(saved.board.level,saved.board.seed,saved.board.version,saved);
-else if((["3","4"].includes(version)||(version==="2"&&level==="tutorial"))&&(level==="tutorial"||Object.hasOwn(E.presets,level))){
+else if((["3","4","5"].includes(version)||(version==="2"&&level==="tutorial"))&&(level==="tutorial"||Object.hasOwn(E.presets,level))){
  const options=Missions.route(Object.fromEntries(params));
  const matches=saved&&JSON.stringify(Missions.route(saved.run))===JSON.stringify(options)&&saved.board.level===level&&saved.board.seed===seed&&saved.board.version===version;
  start(level,seed||newSeed(),version,matches?saved:null,options);

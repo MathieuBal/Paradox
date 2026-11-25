@@ -1,6 +1,6 @@
 /* PARADOX V2 — moteur de déduction spatiale */
 const Paradox = (function makeEngine(){
-const VERSION="4",names=["Alpha","Beta","Gamma","Delta","Epsilon","Zeta"],zones=["Laboratoire","Observatoire","Serre","Réacteur"],objectNames=["Antenne","Paillasse","Réservoir","Refroidisseur","Caisse","Console","Générateur","Archive"],presets={easy:{n:4,objects:4,keep:2},normal:{n:5,objects:5,keep:1},hard:{n:6,objects:7,keep:0}};
+const VERSION="5",names=["Alpha","Beta","Gamma","Delta","Epsilon","Zeta"],zones=["Laboratoire","Observatoire","Serre","Réacteur"],objectNames=["Antenne","Paillasse","Réservoir","Refroidisseur","Caisse","Console","Générateur","Archive"],presets={easy:{n:4,objects:4,keep:2},normal:{n:5,objects:5,keep:1},hard:{n:6,objects:7,keep:0}};
 const range=n=>Array.from({length:n},(_,i)=>i), row=(p,n)=>Math.floor(p/n),col=(p,n)=>p%n, dist=(a,b,n)=>Math.abs(row(a,n)-row(b,n))+Math.abs(col(a,n)-col(b,n)), coord=(p,n)=>p<0?"—":String.fromCharCode(65+col(p,n))+(row(p,n)+1);
 const dirs={N:[-1,0,"nord","↑"],S:[1,0,"sud","↓"],W:[0,-1,"ouest","←"],E:[0,1,"est","→"]};
 function rng(seed){let h=2166136261;for(const c of seed){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return()=>{h=(h+0x6D2B79F5)|0;let t=Math.imul(h^(h>>>15),1|h);t^=t+Math.imul(t^(t>>>7),61|t);return((t^(t>>>14))>>>0)/4294967296}}
@@ -40,9 +40,16 @@ function beamLabel(board,probe){
  return {arrow,text:names[probe]+" émet vers le "+direction+" "+arrow+", "+reach+". Le premier équipement arrête le faisceau."};
 }
 function offsetText(dr,dc){const part=(v,negative,positive)=>Math.abs(v)+(Math.abs(v)===1?" case ":" cases ")+(v<0?negative:positive);return [dr?part(dr,"au-dessus","en dessous"):null,dc?part(dc,"à gauche","à droite"):null].filter(Boolean).join(" et ")}
-function clueText(c){const a=names[c.a],b=names[c.b];switch(c.type){case"closer":return a+" était plus près de l’équipement "+objectNames[c.o]+" que de l’équipement "+objectNames[c.other]+" (en pas horizontaux et verticaux).";case"diagonal":return a+" et "+b+" occupaient la même diagonale.";case"zonePair":return a+" se trouvait dans l’une de ces deux zones : "+zones[c.z]+" ou "+zones[c.alt]+".";case"zone":return a+" se trouvait dans la zone « "+zones[c.z]+" ».";case"objectOffset":return a+" se trouvait "+offsetText(c.dr,c.dc)+" de l’équipement « "+objectNames[c.o]+" ».";case"near":return a+" occupait une case directement voisine de l’équipement « "+objectNames[c.o]+" » (haut, bas, gauche ou droite).";case"distance":return a+" était à "+c.d+" cases de « "+objectNames[c.o]+" » (distance horizontale + verticale).";case"axis":return a+" était sur la même "+(c.axis==="r"?"ligne":"colonne")+" que « "+objectNames[c.o]+" ».";case"edge":return a+(c.y?" se trouvait sur le bord de la carte.":" ne se trouvait sur aucun bord de la carte.");case"offset":return a+" se trouvait "+offsetText(c.dr,c.dc)+(b==="Epsilon"?" d’":" de ")+b+".";case"order":return a+" se trouvait "+(c.axis==="r"?(c.sign>0?"au sud":"au nord"):(c.sign>0?"à l’est":"à l’ouest"))+(b==="Epsilon"?" d’":" de ")+b+".";case"samezone":return a+" et "+b+" étaient dans "+(c.y?"la même zone":"des zones différentes")+".";case"fixed":return a+" se trouvait en "+coord(c.p,c.n)+"."}}
+function clueText(c,version=VERSION){
+ if(version==="3"||version==="4"){
+  const a=names[c.a],b=names[c.b];
+  if(c.type==="distance")return a+" était à "+c.d+" cases de « "+objectNames[c.o]+" » (distance horizontale + verticale).";
+  if(c.type==="offset")return a+" se trouvait "+offsetText(c.dr,c.dc)+(b==="Epsilon"?" d’":" de ")+b+".";
+  if(c.type==="order")return a+" se trouvait "+(c.axis==="r"?(c.sign>0?"au sud":"au nord"):(c.sign>0?"à l’est":"à l’ouest"))+(b==="Epsilon"?" d’":" de ")+b+".";
+ }
+ const a=names[c.a],b=names[c.b],than=b==="Alpha"||b==="Epsilon"?" qu’":" que ";switch(c.type){case"gap":return a+" se trouvait "+Math.abs(c.delta)+(c.axis==="r"?(Math.abs(c.delta)===1?" ligne":" lignes")+(c.delta<0?" plus haut":" plus bas"):(Math.abs(c.delta)===1?" colonne":" colonnes")+(c.delta<0?" plus à gauche":" plus à droite"))+than+b+".";case"closer":return a+" était plus près de l’équipement "+objectNames[c.o]+" que de l’équipement "+objectNames[c.other]+" (en pas horizontaux et verticaux).";case"diagonal":return a+" et "+b+" occupaient la même diagonale.";case"zonePair":return a+" se trouvait dans l’une de ces deux zones : "+zones[c.z]+" ou "+zones[c.alt]+".";case"zone":return a+" se trouvait dans la zone « "+zones[c.z]+" ».";case"objectOffset":return a+" se trouvait "+offsetText(c.dr,c.dc)+" de l’équipement « "+objectNames[c.o]+" ».";case"near":return a+" occupait une case directement voisine de l’équipement « "+objectNames[c.o]+" » (haut, bas, gauche ou droite).";case"distance":return a+" était à "+c.d+" pas de l’équipement « "+objectNames[c.o]+" ». Compte les écarts de ligne et de colonne, même à travers un obstacle.";case"axis":return a+" était sur la même "+(c.axis==="r"?"ligne":"colonne")+" que « "+objectNames[c.o]+" ».";case"edge":return a+(c.y?" se trouvait sur le bord de la carte.":" ne se trouvait sur aucun bord de la carte.");case"offset":return a+" se trouvait "+offsetText(c.dr,c.dc)+(b==="Alpha"||b==="Epsilon"?" d’":" de ")+b+".";case"order":return a+" occupait une "+(c.axis==="r"?(c.sign>0?"ligne plus basse":"ligne plus haute"):(c.sign>0?"colonne plus à droite":"colonne plus à gauche"))+than+b+".";case"samezone":return a+" et "+b+" étaient dans "+(c.y?"la même zone":"des zones différentes")+".";case"fixed":return a+" se trouvait en "+coord(c.p,c.n)+"."}}
 function unary(c,p,B){const n=B.n,o=B.objects.indexOf(c.o);switch(c.type){case"closer":return dist(p,o,n)<dist(p,B.objects.indexOf(c.other),n);case"zonePair":return B.zones[p]===c.z||B.zones[p]===c.alt;case"zone":return B.zones[p]===c.z;case"objectOffset":return row(p,n)-row(o,n)===c.dr&&col(p,n)-col(o,n)===c.dc;case"near":return dist(p,o,n)===1;case"distance":return dist(p,o,n)===c.d;case"axis":return c.axis==="r"?row(p,n)===row(o,n):col(p,n)===col(o,n);case"edge":return (row(p,n)===0||row(p,n)===n-1||col(p,n)===0||col(p,n)===n-1)===c.y;case"fixed":return p===c.p;default:return true}}
-function binary(c,p,q,B){const n=B.n;switch(c.type){case"diagonal":return Math.abs(row(p,n)-row(q,n))===Math.abs(col(p,n)-col(q,n));case"offset":return row(p,n)-row(q,n)===c.dr&&col(p,n)-col(q,n)===c.dc;case"order":return Math.sign(c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;default:return true}}
+function binary(c,p,q,B){const n=B.n;switch(c.type){case"gap":return (c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.delta;case"diagonal":return Math.abs(row(p,n)-row(q,n))===Math.abs(col(p,n)-col(q,n));case"offset":return row(p,n)-row(q,n)===c.dr&&col(p,n)-col(q,n)===c.dc;case"order":return Math.sign(c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;default:return true}}
 function context(B,convergence=true){
  const n=B.n,M=n+(convergence?1:0),free=range(n*n).filter(p=>B.objects[p]==null),unaryClues=range(M).map(i=>B.clues.filter(c=>c.a===i&&c.b==null)),pairs=range(M).map(()=>range(M).map(()=>[])),rays=convergence?[range(n*n).map(p=>new Set(beam(B,0,p))),range(n*n).map(p=>new Set(beam(B,1,p)))]:[];
  for(const c of B.clues)if(c.b!=null){pairs[c.a][c.b].push([c,false]);pairs[c.b][c.a].push([c,true])}
@@ -95,7 +102,7 @@ function mapZones(n,r){const z=Array(n*n).fill(-1),corners=[0,n-1,n*(n-1),n*n-1]
 function generate(seed,level="normal",version=VERSION,signal="standard"){
  if(!["standard","double","long","radial","diagonal","relay"].includes(signal))throw Error("Signal inconnu");
  const P=presets[level];if(!P)throw Error("Difficulté inconnue");const n=P.n,r=rng(version+":"+level+":"+seed);
- for(let attempt=0;attempt<(signal==="standard"?200:1000);attempt++){
+ for(let attempt=0;attempt<(version==="5"?1400:signal==="standard"?200:1000);attempt++){
   const rs=shuffle(range(n),r),cs=shuffle(range(n),r),s=rs.map((v,i)=>v*n+cs[i]),a=s[0],b=s[1];
   const gap=Math.abs(row(b,n)-row(a,n));
   let target=row(b,n)*n+col(a,n);
@@ -113,7 +120,7 @@ function generate(seed,level="normal",version=VERSION,signal="standard"){
   for(let i=0;i<P.objects;i++)B.objects[available[i]]=i;
   let pool=[];for(let i=0;i<n;i++){
     const p=s[i];pool.push({type:"zone",a:i,z:B.zones[p]},{type:"edge",a:i,y:row(p,n)===0||row(p,n)===n-1||col(p,n)===0||col(p,n)===n-1});
-    if(version==="4"&&level!=="easy"){
+    if(version!=="3"&&level!=="easy"){
       const z=B.zones[p], alt=(z+1+Math.floor(r()*3))%4;
       pool.push({type:"zonePair",a:i,z:Math.min(z,alt),alt:Math.max(z,alt)});
       for(let o=0;o<P.objects-1;o++){
@@ -122,9 +129,13 @@ function generate(seed,level="normal",version=VERSION,signal="standard"){
       for(let j=0;j<i;j++)if(Math.abs(row(p,n)-row(s[j],n))===Math.abs(col(p,n)-col(s[j],n)))pool.push({type:"diagonal",a:i,b:j});
     }
     for(let o=0;o<P.objects;o++){const q=available[o],d=dist(p,q,n),dr=row(p,n)-row(q,n),dc=col(p,n)-col(q,n);if(level==="easy"&&d<=3&&Math.abs(dr)<=2&&Math.abs(dc)<=2)pool.push({type:"objectOffset",a:i,o,dr,dc});if(d===1)pool.push({type:"near",a:i,o});else if(d<=3)pool.push({type:"distance",a:i,o,d});if(row(p,n)===row(q,n))pool.push({type:"axis",a:i,o,axis:"r"});if(col(p,n)===col(q,n))pool.push({type:"axis",a:i,o,axis:"c"})}
-    for(let j=0;j<i;j++){const dr=row(p,n)-row(s[j],n),dc=col(p,n)-col(s[j],n);pool.push({type:"order",a:i,b:j,axis:"r",sign:Math.sign(dr)},{type:"order",a:i,b:j,axis:"c",sign:Math.sign(dc)},{type:"samezone",a:i,b:j,y:B.zones[p]===B.zones[s[j]]});if(Math.abs(dr)<=2&&Math.abs(dc)<=2)pool.push({type:"offset",a:i,b:j,dr,dc})}
+    for(let j=0;j<i;j++){const dr=row(p,n)-row(s[j],n),dc=col(p,n)-col(s[j],n);pool.push({type:"order",a:i,b:j,axis:"r",sign:Math.sign(dr)},{type:"order",a:i,b:j,axis:"c",sign:Math.sign(dc)},{type:"samezone",a:i,b:j,y:B.zones[p]===B.zones[s[j]]});if(version==="5"&&level!=="easy"){pool.push({type:"gap",a:i,b:j,axis:"r",delta:dr},{type:"gap",a:i,b:j,axis:"c",delta:dc})}else if(Math.abs(dr)<=2&&Math.abs(dc)<=2)pool.push({type:"offset",a:i,b:j,dr,dc})}
   }
   // Prefer a compact set of clues, starting with all of them and removing redundant ones.
+  if(version==="5"){
+    const free=range(n*n).filter(p=>B.objects[p]==null);
+    pool=pool.filter(c=>c.b!=null||free.filter(p=>unary(c,p,B)).length<=Math.ceil(free.length*.7));
+  }
   B.clues=shuffle(pool,r);
   if(!solve(B).complete)continue;
   for(let i=B.clues.length-1;i>=0;i--){const old=B.clues.splice(i,1)[0];if(!solve(B).complete)B.clues.splice(i,0,old)}
@@ -148,7 +159,13 @@ function generate(seed,level="normal",version=VERSION,signal="standard"){
   if(level==="hard"&&(rating.direct!==0||rating.basicComplete||!anchored(B)))continue;
   B.clues.sort((a,b)=>a.a-b.a);const proof=solve(B,[],true);if(!proof.ok||!proof.complete||!validate(B,B.solution)||proof.values.some((p,i)=>p!==B.solution[i]))continue;
   rating.families=new Set(B.clues.map(c=>c.type)).size;
-  if(version==="4"&&rating.families<(level==="hard"?3:2))continue;
+  if(version!=="3"&&rating.families<(level==="hard"?3:2))continue;
+  if(version==="5"){
+   const starts=context(B).initial.slice(0,n).map(d=>d.length);
+   if(level==="easy"&&(rating.direct!==2||B.clues.filter(c=>c.type==="objectOffset").length>1))continue;
+   if(level==="normal"&&!starts.some(k=>k>=2&&k<=5))continue;
+   if(level==="hard"&&!starts.some(k=>k>=2&&k<=4))continue;
+  }
   B.rounds=proof.rounds;B.rating=rating;return B;
  }
  throw Error("Cette graine n’a pas produit de niveau validé. Essaie une autre graine.");
@@ -169,6 +186,7 @@ function explain(B,placements){
  return {i:step.i,p:step.remaining[0],why:"Pour "+label(step.i)+", il restait "+choices+". "+step.why+"."};
 }
 function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"objectOffset",a:0,o:0,dr:1,dc:-1},{type:"zone",a:1,z:3},{type:"objectOffset",a:2,o:0,dr:0,dc:1},{type:"offset",a:3,b:4,dr:1,dc:1},{type:"zone",a:4,z:2},{type:"near",a:3,o:4}],solution:[7,13,4,21,15,12]}}
-return{VERSION,names,zones,objectNames,presets,dirs,coord,ray,beam,beamLabel,clueText,explain,solve,count,conflict,validate,generate,tutorial,basic,profile,anchored};
+function startingProbe(B){const sizes=context(B).initial.slice(0,B.n).map(d=>d.length);return sizes.indexOf(Math.min(...sizes))}
+return{startingProbe,VERSION,names,zones,objectNames,presets,dirs,coord,ray,beam,beamLabel,clueText,explain,solve,count,conflict,validate,generate,tutorial,basic,profile,anchored};
 })();
 if(typeof module!=="undefined")module.exports=Paradox;

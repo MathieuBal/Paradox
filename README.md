@@ -56,3 +56,12 @@ Huit chapitres introduisent les indices et les six profils de faisceau. Le rappo
 Le menu propose également le marathon de trois difficultés, l’expert absolu (sans indice, vérification intermédiaire ni affichage des faisceaux), le défi quotidien et une mission personnalisée avec choix de grille et de signal. La graine, le profil de signal et le mode sont inclus dans le lien de partage.
 
 Le carnet local conserve les missions distinctes terminées, le temps de jeu actif, les indices demandés et les jours consécutifs de résolution (UTC). Une mission déjà enregistrée ne compte qu’une fois. Les sons sont facultatifs. Les tests indépendants couvrent aussi 225 grilles à faisceaux alternatifs.
+
+
+## Équilibrage des rapports V5
+
+En facile, les rapports géographiques suffisent à fixer deux sondes et au plus un décalage exact renvoie directement à un équipement. En intermédiaire, une seule sonde est déterminée au départ et une autre possède entre deux et cinq cases candidates. En expert, aucune position de départ n’est imposée et au moins une sonde peut être ramenée à deux, trois ou quatre cases par les rapports géographiques.
+
+Aux deux niveaux supérieurs, un écart signé entre sondes renseigne une seule dimension. Par exemple, deux lignes plus bas laisse la colonne à déduire. Les indices géographiques individuels qui conservent plus de 70 % des cases libres (seuil arrondi à l’entier supérieur) sont écartés. Ces mesures décrivent les possibilités du solveur. La difficulté ressentie dépend aussi du joueur.
+
+Les nouveaux liens utilisent le moteur 5. Les graines, solutions et rapports structurés des versions 3 et 4 restent reproductibles.
