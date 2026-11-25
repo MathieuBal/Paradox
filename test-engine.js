@@ -29,7 +29,7 @@ function brute(B, convergence=true, limit=2) {
  }
  function visit(i,rows,cols){
   if(found>=limit)return;
-  if(i===n){if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&alpha(t)&&signal(v[1],B.directions[1],t)){found++;if(found>=limit)return}return}
+  if(i===n){if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&alpha(t)&&signal(v[1],B.directions[1],t)){if(B.twin){for(const u of all)if(u!==t&&!v.includes(u)&&signal(v[2],B.directions[2],u)&&signal(v[3],B.directions[3],u))found++;}else found++;if(found>=limit)return}return}
   for(const p of all){const r=1<<R(p),c=1<<C(p);if((r&rows)||(c&cols))continue;v[i]=p;if(B.clues.every(clue))visit(i+1,rows|r,cols|c);v[i]=-1;if(found>=limit)return}
  }
  visit(0,0,0);return found;
@@ -48,3 +48,6 @@ console.log("301 missions validées par deux solveurs.");
 
 for(const signal of ["long","double","radial","diagonal","relay"])for(const level of Object.keys(E.presets))for(let i=0;i<15;i++)verify(E.generate("variant-"+i,level,E.VERSION,signal));
 console.log("225 missions à signal alternatif validées.");
+
+for(let i=0;i<60;i++){const b=E.generate("double-"+i,"normal",E.VERSION,"standard",true);assert.equal(brute(b),1);assert.deepEqual(E.solve(b).values,b.solution);assert(E.validate(b,b.solution));const swapped=b.solution.slice();[swapped[b.n],swapped[b.n+1]]=[swapped[b.n+1],swapped[b.n]];assert(!E.validate(b,swapped));}
+console.log("60 missions à deux anomalies validées.");

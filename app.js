@@ -2,10 +2,10 @@
 "use strict";
 const E=Paradox,$=id=>document.getElementById(id),labels={tutorial:"Initiation guidée",easy:"Facile",normal:"Intermédiaire",hard:"Expert"},symbols=["α","β","γ","δ","ε","ζ","✦"],colors=["#67e8f9","#c4b5fd","#f5d17c","#89e0ad","#f9a8d4","#a7b7e7"],objectIcons=["◉","▤","▣","❄","▧","▥","ϟ","▦"],zoneColors=["#193c46","#362d49","#234236","#483a29"];
 let board,positions=[],marks=[],history=[],active=0,mode=false,signals=true,done=false,pendingHint=null;
-const indexSymbol=i=>i===board.n?"✦":symbols[i],name=i=>i===board.n?"Anomalie":E.names[i],color=i=>i===board.n?"#f4f1e8":colors[i],coord=p=>E.coord(p,board.n);
+const indexSymbol=i=>i>board.n?"◇":i===board.n?"✦":symbols[i],name=i=>i>board.n?"Écho":i===board.n?(board.twin?"Source":"Anomalie"):E.names[i],color=i=>i>board.n?"#ffd587":i===board.n?"#f4f1e8":colors[i],coord=p=>E.coord(p,board.n);
 function say(s,kind=""){const el=$("status");el.textContent=s;el.dataset.kind=kind}
 function newSeed(){const a=new Uint32Array(2);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(36)).join("-")}
-const modeNames={classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
+const modeNames={twin:"Double anomalie",classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
 let run=Missions.route(), elapsed=0, clock=null, hints=0, recorded=false;
 const journalKey="paradox.journal.1";
 let audioEnabled=false,audioContext;
@@ -90,19 +90,19 @@ function readSave(){
   const x=JSON.parse(localStorage.getItem(saveKey)), b=x?.board;
   if(!b||!["3","4","5"].includes(b.version)||!E.validate(b,b.solution))return null;
   const validPos=p=>Number.isInteger(p)&&(p===-1||(p>=0&&p<b.n*b.n&&b.objects[p]==null));
-  if(x.positions.length!==b.n+1||!x.positions.every(validPos)||x.marks.length!==b.n+1||
+  if(x.positions.length!==b.solution.length||!x.positions.every(validPos)||x.marks.length!==b.solution.length||
     !x.marks.every(v=>/^\d+$/.test(v))||x.candidates.length!==b.n*b.n||!x.candidates.every(Number.isInteger)||
-    !Array.isArray(x.filed)||!Number.isInteger(x.active)||x.active<0||x.active>b.n)return null;
+    !Array.isArray(x.filed)||!Number.isInteger(x.active)||x.active<0||x.active>=b.solution.length)return null;
   return x;
  }catch{return null}
 }
-function generateAsync(level,seed,version,signal){
- if(location.protocol==="file:"||!window.Worker)return E.generate(seed,level,version,signal);
+function generateAsync(level,seed,version,signal,twin){
+ if(location.protocol==="file:"||!window.Worker)return E.generate(seed,level,version,signal,twin);
  return new Promise((resolve,reject)=>{
-   worker=new Worker("generator.js?v=71");
+   worker=new Worker("generator.js?v=72");
    worker.onmessage=({data})=>data.error?reject(Error(data.error)):resolve(data.board);
    worker.onerror=()=>reject(Error("Génération interrompue. Relance la mission."));
-   worker.postMessage({level,seed,version,signal});
+   worker.postMessage({level,seed,version,signal,twin});
  });
 }
 async function start(level,seed,version=E.VERSION,saved=null,options={}){
@@ -112,11 +112,11 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  const message=$("mission-menu").hidden?$("status"):$("menu-error");
  message.textContent="Préparation du plan de la station…";
  try{
-  const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal));
+  const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal,nextRun.kind==="twin"));
   if(ticket!==generation)return;
   cluePage=0;trial=saved?.trial||null;$("recovered-file").open=false;
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
-  $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
+  $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.solution.length).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.solution.length).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
   history=[];active=saved?.active??(p.level==="tutorial"?0:E.startingProbe(p));mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
   done=!!saved?.done&&E.validate(p,positions);pendingHint=null;
@@ -181,6 +181,11 @@ function render(){
  const n=board.n,N=n*n,grid=$("map");grid.replaceChildren();grid.style.setProperty("--n",n);
  const entries=board.clues.map(c=>({clue:c,i:c.a,related:c.b,txt:E.clueText(c,board.version)}));
  entries.push({i:0,txt:E.beamLabel(board,0).text},{i:1,txt:E.beamLabel(board,1).text},{i:n,related:0,other:1,txt:"L’anomalie se trouve sur une case libre où les deux signaux se croisent."});
+ if(board.twin){
+  entries[entries.length-1].txt="La Source se trouve au croisement des faisceaux d’Alpha et de Beta.";
+  for(const i of [2,3])entries.push({i,txt:E.beamLabel(board,i).text});
+  entries.push({i:n+1,related:2,other:3,txt:"L’Écho se trouve au croisement des faisceaux de Gamma et de Delta."});
+ }
  entries.sort((a,b)=>a.i-b.i);
  const relevant=c=>c.i===active||c.related===active||c.other===active;
  const pinned=entries.find(e=>e.txt===pinnedText);
@@ -195,7 +200,9 @@ function render(){
    button.setAttribute("aria-pressed",String(i===active));button.style.setProperty("--token",color(i));
    button.onclick=()=>{active=i;pendingHint=null;render();$("unpin").focus({preventScroll:true})};switches.append(button);
  }
- const rays=[0,1].map(i=>signals&&positions[i]>=0?E.beam(board,i,positions[i]):[]);
+ const pair=board.twin&&[2,3,n+1].includes(active)?[2,3]:[0,1];
+ $("beam-one").textContent="■ "+E.names[pair[0]];$("beam-two").textContent="■ "+E.names[pair[1]];
+ const rays=pair.map(i=>signals&&positions[i]>=0?E.beam(board,i,positions[i]):[]);
  const selected=positions[active];
  for(let p=0;p<N;p++){
   const r=Math.floor(p/n),c=p%n,z=board.zones[p],o=board.objects[p],i=positions.indexOf(p),b=document.createElement("button");b.type="button";b.className="cell";b.dataset.cell=p;b.dataset.zone=z;
@@ -203,15 +210,15 @@ function render(){
   if(c===0||board.zones[p-1]!==z)b.classList.add("wall-left");if(c===n-1||board.zones[p+1]!==z)b.classList.add("wall-right");if(r===0||board.zones[p-n]!==z)b.classList.add("wall-top");if(r===n-1||board.zones[p+n]!==z)b.classList.add("wall-bottom");
   if(i===active)b.classList.add("selected");if(selected>=0&&active<n&&i!==active&&(Math.floor(selected/n)===r||selected%n===c))b.classList.add("axis");
   if(rays[0].includes(p)){
-   b.classList.add("ray-a");const origin=positions[0],dr=r-Math.floor(origin/n),dc=c-origin%n;
+   b.classList.add("ray-a");const origin=positions[pair[0]],dr=r-Math.floor(origin/n),dc=c-origin%n;
    b.style.setProperty("--bearing",!dr?"0deg":!dc?"90deg":dr*dc>0?"45deg":"-45deg");
-  }if(rays[1].includes(p))b.classList.add("ray-b");if(rays[0].includes(p)&&rays[1].includes(p))b.classList.add("cross");
+  }if(rays[1].includes(p)){b.classList.add("ray-b");b.style.setProperty("--bearing-b",Math.floor(positions[pair[1]]/n)===r?"0deg":"90deg")}if(rays[0].includes(p)&&rays[1].includes(p))b.classList.add("cross");
   if(o!=null)b.classList.add("obstacle");if((marks[active]&(1n<<BigInt(p)))!==0n)b.classList.add("excluded");
   const tag=document.createElement("span");tag.className="coordinate";tag.textContent=coord(p);b.append(tag);const zoneTag=document.createElement("span");zoneTag.className="zone-tag";zoneTag.textContent=["L","O","S","R"][z];b.append(zoneTag);
   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent=o!=null?objectIcons[o]:i>=0?indexSymbol(i):"";
   if(i<0&&o==null&&candidates[p]){
     const annotation=document.createElement("span");annotation.className="candidates";
-    for(let k=0;k<=n;k++)if(candidates[p]&(1<<k)){
+    for(let k=0;k<positions.length;k++)if(candidates[p]&(1<<k)){
       const token=document.createElement("b");token.textContent=indexSymbol(k);token.style.color=color(k);annotation.append(token);
     }
     b.append(annotation);
@@ -222,17 +229,17 @@ function render(){
     const use=document.createElementNS(icon.namespaceURI,"use");use.setAttribute("href","equipment.svg#unit-"+o);icon.append(use);
     glyph.replaceChildren(icon);
   }
-  if(i>=0&&i<2){const arrow=document.createElement("sup");arrow.textContent=E.beamLabel(board,i).arrow;glyph.append(arrow)}b.append(glyph);
+  if(i>=0&&i<(board.twin?4:2)){const arrow=document.createElement("sup");arrow.textContent=E.beamLabel(board,i).arrow;glyph.append(arrow)}b.append(glyph);
   const subtitle=document.createElement("span");subtitle.className="cell-label";subtitle.textContent=o!=null?E.objectNames[o]:i>=0?name(i):"";b.append(subtitle);
   b.setAttribute("aria-label",coord(p)+", "+E.zones[z]+(o!=null?", "+E.objectNames[o]:i>=0?", "+name(i)+", position proposée":", libre"));b.setAttribute("aria-pressed",String(i===active));
-  if(candidates[p]&&i<0)b.setAttribute("aria-label",b.getAttribute("aria-label")+", hypothèses "+Array.from({length:n+1},(_,k)=>k).filter(k=>candidates[p]&(1<<k)).map(name).join(", "));
+  if(candidates[p]&&i<0)b.setAttribute("aria-label",b.getAttribute("aria-label")+", hypothèses "+Array.from({length:positions.length},(_,k)=>k).filter(k=>candidates[p]&(1<<k)).map(name).join(", "));
   if(o!=null)b.dataset.object=o;
-  if(i>=0){b.dataset.probe=i===n?"anomaly":i;b.classList.add("with-probe")}
+  if(i>=0){b.dataset.probe=i>=n?"anomaly":i;b.classList.add("with-probe")}
   if(references.has(p)){b.classList.add("referenced");b.setAttribute("aria-label",b.getAttribute("aria-label")+", repère du rapport")}
   b.onclick=()=>{place(p);grid.querySelector(`[data-cell="${p}"]`)?.focus({preventScroll:true})};grid.append(b);
  }
  const palette=$("palette");palette.replaceChildren();
- for(let i=0;i<=n;i++){const b=document.createElement("button");b.type="button";b.className="token";if(positions[i]>=0)b.classList.add("placed");b.style.setProperty("--token",color(i));b.setAttribute("aria-pressed",String(i===active));b.innerHTML=`<strong>${indexSymbol(i)}${i<2?`<sup>${E.beamLabel(board,i).arrow}</sup>`:""}</strong><span>${name(i)}</span><small>${positions[i]<0?"À placer":coord(positions[i])}</small>`;b.onclick=()=>select(i);palette.append(b)}
+ for(let i=0;i<positions.length;i++){const b=document.createElement("button");b.type="button";b.className="token";if(positions[i]>=0)b.classList.add("placed");b.style.setProperty("--token",color(i));b.setAttribute("aria-pressed",String(i===active));b.innerHTML=`<strong>${indexSymbol(i)}${i<(board.twin?4:2)?`<sup>${E.beamLabel(board,i).arrow}</sup>`:""}</strong><span>${name(i)}</span><small>${positions[i]<0?"À placer":coord(positions[i])}</small>`;b.onclick=()=>select(i);palette.append(b)}
  const reports=$("reports");reports.replaceChildren();
  for(const c of entries){const b=document.createElement("button");b.type="button";b.className="report";if(relevant(c))b.classList.add("report-active");b.style.setProperty("--token",color(c.i));const badge=document.createElement("span");badge.className="report-icon";badge.textContent=indexSymbol(c.i);const t=document.createElement("span");t.textContent=c.txt;b.append(badge,t);b.onclick=()=>pin(c,true);const line=document.createElement("div");line.className="report-line";line.classList.toggle("filed",filed.has(c.txt));
  const tick=document.createElement("button");tick.className="file-report";tick.textContent="✓";tick.setAttribute("aria-pressed",String(filed.has(c.txt)));tick.setAttribute("aria-label","Marquer comme exploité : "+c.txt);
@@ -247,7 +254,7 @@ function render(){
  $("focus-title").textContent="Rapports · "+name(active);$("focus-title").style.color=color(active);
  $("starter").hidden=board.level!=="tutorial";$("selection").textContent=name(active)+" · "+(positions[active]<0?"à placer":coord(positions[active]));$("selection").style.color=color(active);
  $("notes").setAttribute("aria-pressed",String(mode===true));$("rays").setAttribute("aria-pressed",String(signals));$("undo").disabled=!history.length;$("erase").disabled=positions[active]<0||done;
- const count=positions.filter(p=>p>=0).length;$("progress").max=n+1;$("progress").value=count;$("progressLabel").textContent=`${count}/${n+1} entités localisées`;$("metadata").textContent=`${labels[board.level]} · ${n} × ${n} · ${board.clues.length} rapports de position`;
+ const count=positions.filter(p=>p>=0).length;$("progress").max=positions.length;$("progress").value=count;$("progressLabel").textContent=`${count}/${positions.length} entités localisées`;$("metadata").textContent=`${labels[board.level]} · ${n} × ${n} · ${board.clues.length} rapports de position`;
  $("candidate").setAttribute("aria-pressed",String(mode==="candidate"));persist();
  $("trial").hidden=!!trial||done;$("trial-actions").hidden=!trial||done;
  const absolute=run.kind==="absolute";
@@ -263,13 +270,14 @@ function render(){
  const marathon=run.kind==="marathon";
  $("brief").hidden=run.kind==="classic";
  $("brief").textContent=chapter?"Chapitre "+(run.stage+1)+" · "+chapter.title+". "+chapter.brief:
-   marathon?"Marathon · Mission "+(run.stage+1)+" sur 3":modeNames[run.kind];
+   run.kind==="twin"?"Alpha et Beta localisent la Source. Gamma et Delta localisent l’Écho. Sélectionne une cible pour voir ses faisceaux.":marathon?"Marathon · Mission "+(run.stage+1)+" sur 3":modeNames[run.kind];
  $("result-details").textContent=done?Missions.duration(playTime())+" de jeu · "+hints+" indice(s) demandé(s).":"";
  $("next").textContent=chapter?(run.stage===Missions.chapters.length-1?"Terminer la campagne":"Chapitre suivant"):
    marathon?(run.stage===2?"Terminer le marathon":"Étape suivante"):"Mission suivante";
  $("validate").disabled=done;$("hint").disabled=done;$("check").disabled=done;$("win").hidden=!done;
 }
 $("campaign").onclick=()=>launch(Missions.chapter(chapterIndex()));
+$("twin").onclick=()=>launch(["normal",newSeed(),{kind:"twin"}]);
 $("marathon").onclick=()=>launch(Missions.marathon(0,newSeed()));
 $("absolute").onclick=()=>launch(["hard",newSeed(),{kind:"absolute"}]);
 $("custom").onclick=()=>launch([$("custom-level").value,newSeed(),{kind:"custom",signal:$("custom-signal").value}]);
@@ -281,7 +289,7 @@ $("new").onclick=()=>{
  if(run.kind==="campaign")return launch(Missions.chapter(run.stage));
  if(run.kind==="marathon")return launch(Missions.marathon(0,newSeed()));
  const level=board.level==="tutorial"?"easy":board.level;
- return launch([level,newSeed(),["custom","absolute"].includes(run.kind)?run:{}]);
+ return launch([level,newSeed(),["custom","absolute","twin"].includes(run.kind)?run:{}]);
 };
 $("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis une graine.");return}start(seed==="incident-001"?"tutorial":board.level==="tutorial"?"easy":board.level,seed)};
 $("share").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);say("Lien de la mission copié.")}catch{say("Copie l’adresse de cette page pour partager la mission.")}};
@@ -290,7 +298,7 @@ $("candidate").onclick=()=>{mode=mode==="candidate"?false:"candidate";render();s
 $("rays").onclick=()=>{signals=!signals;render()};
 $("erase").onclick=()=>{if(done||positions[active]<0)return;snapshot();positions[active]=-1;say("");render()};
 $("undo").onclick=()=>{const prev=history.pop();if(!prev)return;pendingHint=null;positions=prev.positions;marks=prev.marks;candidates=prev.candidates;filed=new Set(prev.filed);active=prev.active;done=false;updateClock();render();say("Dernière action annulée.")};
-$("reset").onclick=()=>{snapshot();pinnedText=null;positions=Array(board.n+1).fill(-1);marks.fill(0n);candidates.fill(0);filed.clear();active=0;mode=false;done=false;pendingHint=null;updateClock();render();say("Mission réinitialisée.")};
+$("reset").onclick=()=>{snapshot();pinnedText=null;positions=Array(board.solution.length).fill(-1);marks.fill(0n);candidates.fill(0);filed.clear();active=0;mode=false;done=false;pendingHint=null;updateClock();render();say("Mission réinitialisée.")};
 $("check").onclick=()=>{const issue=E.conflict(board,positions);if(issue){say(issue,"error");return}const result=E.solve(board,positions);say(result.ok?"Aucune contradiction détectée par les règles de déduction.":"Au moins un placement est incompatible avec les rapports ou les règles.",result.ok?"":"error")};
 $("hint").onclick=()=>{
  const s=E.solve(board,positions,true);if(!s.ok){pendingHint=null;say("Tes placements sont contradictoires. Vérifie les rapports et les lignes/colonnes.","error");return}
@@ -299,13 +307,13 @@ $("hint").onclick=()=>{
  if(!hint){say("Toutes les entités sont déjà placées.");return}
  hints++;active=hint.i;pendingHint=hint;render();say("Observe "+name(hint.i)+". "+hint.why+" Touche encore Indice pour voir la case.");
 };
-$("validate").onclick=()=>{if(positions.includes(-1)){say("Localise toutes les sondes et l’anomalie avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}trial=null;done=true;updateClock();recordWin();tone(true);render();say("MISSION ACCOMPLIE — Anomalie localisée !","win")};
+$("validate").onclick=()=>{if(positions.includes(-1)){say("Place toutes les entités avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}trial=null;done=true;updateClock();recordWin();tone(true);render();say(board.twin?"Source et Écho localisés !":"MISSION ACCOMPLIE — Anomalie localisée !","win")};
 $("next").onclick=()=>{
  if(run.kind==="campaign")return run.stage+1<Missions.chapters.length?launch(Missions.chapter(run.stage+1)):menu(true);
  if(run.kind==="marathon")return run.stage<2?launch(Missions.marathon(run.stage+1,board.seed)):menu(true);
  return $("new").click();
 };
-document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-7]$/.test(e.key)&&+e.key<=board.n+1){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
+document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-8]$/.test(e.key)&&+e.key<=positions.length){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
 const params=new URLSearchParams(location.search),level=params.get("level"),version=params.get("v"),seed=params.get("seed"),saved=readSave();
 if(!level&&saved)start(saved.board.level,saved.board.seed,saved.board.version,saved);
 else if((["3","4","5"].includes(version)||(version==="2"&&level==="tutorial"))&&(level==="tutorial"||Object.hasOwn(E.presets,level))){

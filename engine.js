@@ -51,9 +51,9 @@ function clueText(c,version=VERSION){
 function unary(c,p,B){const n=B.n,o=B.objects.indexOf(c.o);switch(c.type){case"closer":return dist(p,o,n)<dist(p,B.objects.indexOf(c.other),n);case"zonePair":return B.zones[p]===c.z||B.zones[p]===c.alt;case"zone":return B.zones[p]===c.z;case"objectOffset":return row(p,n)-row(o,n)===c.dr&&col(p,n)-col(o,n)===c.dc;case"near":return dist(p,o,n)===1;case"distance":return dist(p,o,n)===c.d;case"axis":return c.axis==="r"?row(p,n)===row(o,n):col(p,n)===col(o,n);case"edge":return (row(p,n)===0||row(p,n)===n-1||col(p,n)===0||col(p,n)===n-1)===c.y;case"fixed":return p===c.p;default:return true}}
 function binary(c,p,q,B){const n=B.n;switch(c.type){case"gap":return (c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.delta;case"diagonal":return Math.abs(row(p,n)-row(q,n))===Math.abs(col(p,n)-col(q,n));case"offset":return row(p,n)-row(q,n)===c.dr&&col(p,n)-col(q,n)===c.dc;case"order":return Math.sign(c.axis==="r"?row(p,n)-row(q,n):col(p,n)-col(q,n))===c.sign;case"samezone":return (B.zones[p]===B.zones[q])===c.y;default:return true}}
 function context(B,convergence=true){
- const n=B.n,M=n+(convergence?1:0),free=range(n*n).filter(p=>B.objects[p]==null),unaryClues=range(M).map(i=>B.clues.filter(c=>c.a===i&&c.b==null)),pairs=range(M).map(()=>range(M).map(()=>[])),rays=convergence?[range(n*n).map(p=>new Set(beam(B,0,p))),range(n*n).map(p=>new Set(beam(B,1,p)))]:[];
+ const n=B.n,M=n+(convergence?(B.twin?2:1):0),free=range(n*n).filter(p=>B.objects[p]==null),unaryClues=range(M).map(i=>B.clues.filter(c=>c.a===i&&c.b==null)),pairs=range(M).map(()=>range(M).map(()=>[])),rays=convergence?range(B.twin?4:2).map(k=>range(n*n).map(p=>new Set(beam(B,k,p)))):[];
  for(const c of B.clues)if(c.b!=null){pairs[c.a][c.b].push([c,false]);pairs[c.b][c.a].push([c,true])}
- function compatible(i,p,j,q){if(p===q)return false;if(i<n&&j<n){if(row(p,n)===row(q,n)||col(p,n)===col(q,n))return false;for(const [c,rev] of pairs[i][j])if(!binary(c,rev?q:p,rev?p:q,B))return false}else if(convergence){const k=i===n?j:i,from=i===n?q:p,to=i===n?p:q;if(k<2&&!rays[k][from].has(to))return false}return true}
+ function compatible(i,p,j,q){if(p===q)return false;if(i<n&&j<n){if(row(p,n)===row(q,n)||col(p,n)===col(q,n))return false;for(const [c,rev] of pairs[i][j])if(!binary(c,rev?q:p,rev?p:q,B))return false}else if(convergence){const probe=Math.min(i,j),target=Math.max(i,j);if(probe<n&&Math.floor(probe/2)===target-n&&!rays[probe][i<n?p:q].has(i<n?q:p))return false}return true}
  const initial=range(M).map(i=>free.filter(p=>unaryClues[i].every(c=>unary(c,p,B))));
  return{n,M,initial,compatible,pairs,unaryClues,convergence};
 }
@@ -62,7 +62,7 @@ function propagate(C,domains,trace=false){
  function reduce(i,next,why){if(next.length===d[i].length)return;const old=d[i];d[i]=next;change=true;if(trace)steps.push({i,removed:old.filter(p=>!next.includes(p)),remaining:next.slice(),why})}
  while(change){change=false;rounds++;
   if(d.some(a=>a.length===0))return{ok:false,domains:d,steps,rounds};
-  for(let i=0;i<M;i++)for(let j=0;j<M;j++)if(i!==j){const why=i===n||j===n?((i===0||i===1||j===0||j===1)?"Convergence des signaux ou case occupée":"L’anomalie doit être sur une case libre"):C.pairs[i][j].length?"Rapport de "+names[i]+" / "+names[j]+" et lignes-colonnes":"Une seule sonde par ligne et colonne ("+names[j]+")";reduce(i,d[i].filter(p=>d[j].some(q=>compatible(i,p,j,q))),trace&&i<n&&j<n?(C.pairs[i][j].map(([c])=>clueText(c)).join(" ")+" Compare avec "+names[j]+" ("+d[j].map(q=>coord(q,n)).join(", ")+") : chaque paire doit respecter les rapports et occuper deux lignes et deux colonnes distinctes.").trim():why);if(!d[i].length)return{ok:false,domains:d,steps,rounds}}
+  for(let i=0;i<M;i++)for(let j=0;j<M;j++)if(i!==j){const why=i>=n||j>=n?((i===0||i===1||j===0||j===1)?"Convergence des signaux ou case occupée":"L’anomalie doit être sur une case libre"):C.pairs[i][j].length?"Rapport de "+names[i]+" / "+names[j]+" et lignes-colonnes":"Une seule sonde par ligne et colonne ("+names[j]+")";reduce(i,d[i].filter(p=>d[j].some(q=>compatible(i,p,j,q))),trace&&i<n&&j<n?(C.pairs[i][j].map(([c])=>clueText(c)).join(" ")+" Compare avec "+names[j]+" ("+d[j].map(q=>coord(q,n)).join(", ")+") : chaque paire doit respecter les rapports et occuper deux lignes et deux colonnes distinctes.").trim():why);if(!d[i].length)return{ok:false,domains:d,steps,rounds}}
   for(const axis of [row,col])for(let k=0;k<n;k++){const who=range(n).filter(i=>d[i].some(p=>axis(p,n)===k));if(!who.length)return{ok:false,domains:d,steps,rounds};if(who.length===1){const i=who[0];reduce(i,d[i].filter(p=>axis(p,n)===k),"Seule sonde possible pour "+(axis===row?"la ligne ":"la colonne ")+(k+1))}}
  }
  return{ok:true,complete:d.every(a=>a.length===1),domains:d,values:d.map(a=>a.length===1?a[0]:-1),steps,rounds};
@@ -92,14 +92,31 @@ function conflict(B,positions){
   if(p>=0&&(c.b==null?!unary(c,p,B):q>=0&&!binary(c,p,q,B)))
    return "Ce placement contredit le rapport suivant. "+clueText(c);
  }
- const target=positions[B.n];
- if(target>=0)for(let i=0;i<2;i++)if(positions[i]>=0&&!beam(B,i,positions[i]).includes(target))
-  return "Depuis "+coord(positions[i],B.n)+", le faisceau de "+names[i]+" n’atteint pas l’anomalie proposée en "+coord(target,B.n)+".";
+ for(let i=0;i<(B.twin?4:2);i++){
+  const target=positions[B.n+Math.floor(i/2)];
+  if(target>=0&&positions[i]>=0&&!beam(B,i,positions[i]).includes(target))
+   return "Depuis "+coord(positions[i],B.n)+", le faisceau de "+names[i]+" n’atteint pas la cible en "+coord(target,B.n)+".";
+ }
  return null;
 }
-function validate(B,p){if(p.length!==B.n+1||p.some(x=>!Number.isInteger(x)||x<0||x>=B.n*B.n))return false;const C=context(B);return p.every((q,i)=>C.initial[i].includes(q)&&p.every((v,j)=>i===j||C.compatible(i,q,j,v)))}
+function validate(B,p){if(p.length!==B.n+(B.twin?2:1)||p.some(x=>!Number.isInteger(x)||x<0||x>=B.n*B.n))return false;const C=context(B);return p.every((q,i)=>C.initial[i].includes(q)&&p.every((v,j)=>i===j||C.compatible(i,q,j,v)))}
 function mapZones(n,r){const z=Array(n*n).fill(-1),corners=[0,n-1,n*(n-1),n*n-1],front=[];for(let k=0;k<4;k++){z[corners[k]]=k;front.push(corners[k])}while(front.length){const i=Math.floor(r()*front.length),p=front.splice(i,1)[0];for(const q of shuffle(range(n*n).filter(q=>dist(p,q,n)===1),r))if(z[q]<0){z[q]=z[p];front.push(q)}}return z}
-function generate(seed,level="normal",version=VERSION,signal="standard"){
+function generate(seed,level="normal",version=VERSION,signal="standard",twin=false){
+ if(twin){
+  for(let attempt=0;attempt<80;attempt++){
+   const B=generate(seed+"/double/"+attempt,level,version,signal),[g,d]=B.solution.slice(2,4);
+   for(const vertical of [true,false]){
+    const target=vertical?row(d,B.n)*B.n+col(g,B.n):row(g,B.n)*B.n+col(d,B.n);
+    if(B.solution.includes(target)||B.objects[target]!=null)continue;
+    const heading=p=>row(p,B.n)===row(target,B.n)?(p<target?"E":"W"):(p<target?"S":"N");
+    if(![g,d].every(p=>ray(p,heading(p),B).includes(target)))continue;
+    B.directions.push(heading(g),heading(d));B.twin=true;B.seed=seed;B.solution.push(target);
+    return B;
+   }
+  }
+  throw Error("Aucun double signal trouvé pour cette graine.");
+ }
+
  if(!["standard","double","long","radial","diagonal","relay"].includes(signal))throw Error("Signal inconnu");
  const P=presets[level];if(!P)throw Error("Difficulté inconnue");const n=P.n,r=rng(version+":"+level+":"+seed);
  for(let attempt=0;attempt<(version==="5"?1400:signal==="standard"?200:1000);attempt++){
@@ -173,7 +190,7 @@ function generate(seed,level="normal",version=VERSION,signal="standard"){
 // Replay eliminations from the player's placements, without reading the hidden solution.
 function explain(B,placements){
  const C=context(B), empty=i=>placements[i]==null||placements[i]<0;
- const label=i=>i===B.n?"l’anomalie":names[i];
+ const label=i=>i>=B.n?"l’anomalie":names[i];
  const domains=C.initial.map((cells,i)=>empty(i)?cells:cells.filter(p=>p===placements[i]));
  for(let i=0;i<B.n;i++)if(empty(i)&&domains[i].length===1){
    return {i,p:domains[i][0],why:C.unaryClues[i].map(clueText).join(" ")+" Une seule case libre satisfait ces rapports."};

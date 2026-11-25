@@ -10,7 +10,7 @@ const Missions = (() => {
   {evidence:"Message vocal d’Alma",title:"L’antenne relais",level:"hard",signal:"relay",seed:"antenne-relais",brief:"Cherche les positions où Alpha peut atteindre l’antenne et prolonger son faisceau.",arrival:"L’antenne du quai renvoie un paquet vieux de trente ans. Son destinataire est le poste que tu occupes aujourd’hui.",fragment:"Le paquet contient la voix d’Alma. « Si vous effacez le doublon, vous effacez aussi notre départ. J’ai laissé les sondes en marche. Vous pourrez refaire le trajet. »"},
   {evidence:"Photographie du départ",title:"Dernière transmission",level:"hard",signal:"double",seed:"derniere-transmission",brief:"Aucune position directe. Note plusieurs candidates, puis croise les rapports avec le balayage d’Alpha.",arrival:"Il reste deux versions du dernier appel. Dans l’une, Alma est encore au quai. Dans l’autre, sa place à bord du Tilleul est occupée.",fragment:"Les onze minutes s’emboîtent enfin. Sur le dernier cliché du Tilleul, Alma tient la tasse à l’anse bleue. Son frère a écrit au dos « Je t’ai attendue ». Le registre de Nacre peut enfin porter leurs deux noms."}
  ];
- const formats=["classic","daily","campaign","marathon","custom","absolute"];
+ const formats=["classic","daily","campaign","marathon","custom","absolute","twin"];
  const levels=["easy","normal","hard"];
  function route(raw={}){
   const kind=formats.includes(raw.kind)?raw.kind:"classic";

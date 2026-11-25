@@ -1,7 +1,7 @@
-importScripts("engine.js?v=71");
+importScripts("engine.js?v=72");
 self.onmessage = ({data}) => {
   try {
-    self.postMessage({board: Paradox.generate(data.seed, data.level, data.version,data.signal)});
+    self.postMessage({board: Paradox.generate(data.seed, data.level, data.version,data.signal,data.twin)});
   } catch (error) {
     self.postMessage({error: error.message});
   }
