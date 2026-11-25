@@ -77,13 +77,13 @@ function launch([level,seed,options]){return start(level,seed,E.VERSION,null,opt
 document.addEventListener("visibilitychange",()=>{updateClock();persist()});
 window.addEventListener("pagehide",()=>{updateClock();persist()});
 function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
-let pinnedText=null;
+let pinnedText=null, cluePage=0, trial=null;
 let candidates=[], filed=new Set(), generation=0, worker=null;
 const saveKey="paradox.mission.4";
 function persist(){
  if(!board)return;
  try{localStorage.setItem(saveKey,JSON.stringify({board,positions,marks:marks.map(String),candidates,
-   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded,pinnedText}));}catch{}
+   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded,pinnedText,trial}));}catch{}
 }
 function readSave(){
  try{
@@ -114,6 +114,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  try{
   const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal));
   if(ticket!==generation)return;
+  cluePage=0;trial=saved?.trial||null;$("recovered-file").open=false;
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
   $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.n+1).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.n+1).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
@@ -131,7 +132,20 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  finally{if(ticket===generation){worker?.terminate();worker=null}}
 }
 function snapshot(){pendingHint=null;history.push({positions:positions.slice(),marks:marks.slice(),candidates:candidates.slice(),filed:[...filed],active});if(history.length>200)history.shift()}
-function select(i){if(active!==i){pendingHint=null;pinnedText=null;}active=i;render()}
+$("trial").onclick=()=>{
+ if(done||trial)return;
+ trial={positions:positions.slice(),marks:marks.map(String),candidates:candidates.slice(),filed:[...filed],active,pinnedText,mode,signals};
+ render();say("Essaie tes placements. Tu pourras revenir à cette grille.");
+};
+$("keep-trial").onclick=()=>{trial=null;render();say("Placements et notes conservés.")};
+$("drop-trial").onclick=()=>{
+ if(!trial)return;
+ snapshot();positions=trial.positions;marks=trial.marks.map(BigInt);candidates=trial.candidates;filed=new Set(trial.filed);
+ active=trial.active;pinnedText=trial.pinnedText;mode=trial.mode;signals=trial.signals;trial=null;cluePage=0;
+ render();say("Grille et notes restaurées.");
+};
+$("cycle-clue").onclick=()=>{cluePage++;render();$("cycle-clue").focus({preventScroll:true})};
+function select(i){if(active!==i){cluePage=0;pendingHint=null;pinnedText=null;}active=i;render()}
 function place(p){
  if(!board||done)return;if(board.objects[p]!=null){say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
  if(mode==="candidate"){
@@ -188,7 +202,10 @@ function render(){
   b.style.setProperty("--zone",zoneColors[z]);b.style.setProperty("--token",i>=0?color(i):color(active));
   if(c===0||board.zones[p-1]!==z)b.classList.add("wall-left");if(c===n-1||board.zones[p+1]!==z)b.classList.add("wall-right");if(r===0||board.zones[p-n]!==z)b.classList.add("wall-top");if(r===n-1||board.zones[p+n]!==z)b.classList.add("wall-bottom");
   if(i===active)b.classList.add("selected");if(selected>=0&&active<n&&i!==active&&(Math.floor(selected/n)===r||selected%n===c))b.classList.add("axis");
-  if(rays[0].includes(p))b.classList.add("ray-a");if(rays[1].includes(p))b.classList.add("ray-b");if(rays[0].includes(p)&&rays[1].includes(p))b.classList.add("cross");
+  if(rays[0].includes(p)){
+   b.classList.add("ray-a");const origin=positions[0],dr=r-Math.floor(origin/n),dc=c-origin%n;
+   b.style.setProperty("--bearing",!dr?"0deg":!dc?"90deg":dr*dc>0?"45deg":"-45deg");
+  }if(rays[1].includes(p))b.classList.add("ray-b");if(rays[0].includes(p)&&rays[1].includes(p))b.classList.add("cross");
   if(o!=null)b.classList.add("obstacle");if((marks[active]&(1n<<BigInt(p)))!==0n)b.classList.add("excluded");
   const tag=document.createElement("span");tag.className="coordinate";tag.textContent=coord(p);b.append(tag);const zoneTag=document.createElement("span");zoneTag.className="zone-tag";zoneTag.textContent=["L","O","S","R"][z];b.append(zoneTag);
   const glyph=document.createElement("span");glyph.className="glyph";glyph.textContent=o!=null?objectIcons[o]:i>=0?indexSymbol(i):"";
@@ -221,17 +238,26 @@ function render(){
  const tick=document.createElement("button");tick.className="file-report";tick.textContent="✓";tick.setAttribute("aria-pressed",String(filed.has(c.txt)));tick.setAttribute("aria-label","Marquer comme exploité : "+c.txt);
  tick.onclick=()=>{snapshot();if(filed.has(c.txt))filed.delete(c.txt);else filed.add(c.txt);render();$("reports").querySelectorAll(".file-report")[entries.indexOf(c)].focus({preventScroll:true})};
  line.append(b,tick);reports.append(line)}
- const focus=$("focus-reports");focus.replaceChildren();for(const c of entries.filter(relevant)){const li=document.createElement("li");const link=document.createElement("button");link.type="button";link.className="focus-clue";link.textContent=c.txt;link.onclick=()=>pin(c,false);li.append(link);li.classList.toggle("filed",filed.has(c.txt));focus.append(li)}if(!focus.children.length){const li=document.createElement("li");li.textContent="Aucun rapport direct : recoupe les autres rapports et les lignes et colonnes.";focus.append(li)}
+ const focus=$("focus-reports");focus.replaceChildren();const availableClues=entries.filter(relevant);
+ const page=cluePage%Math.max(1,availableClues.length);
+ $("cycle-clue").hidden=availableClues.length<2;
+ $("cycle-clue").textContent="Suivant · "+(page+1)+"/"+availableClues.length;
+ $("focus-panel").hidden=!!pinned;
+ for(const c of availableClues.slice(page,page+1)){const li=document.createElement("li");const link=document.createElement("button");link.type="button";link.className="focus-clue";link.textContent=c.txt;link.onclick=()=>pin(c,false);li.append(link);li.classList.toggle("filed",filed.has(c.txt));focus.append(li)}if(!focus.children.length){const li=document.createElement("li");li.textContent="Aucun rapport direct : recoupe les autres rapports et les lignes et colonnes.";focus.append(li)}
  $("focus-title").textContent="Rapports · "+name(active);$("focus-title").style.color=color(active);
  $("starter").hidden=board.level!=="tutorial";$("selection").textContent=name(active)+" · "+(positions[active]<0?"à placer":coord(positions[active]));$("selection").style.color=color(active);
  $("notes").setAttribute("aria-pressed",String(mode===true));$("rays").setAttribute("aria-pressed",String(signals));$("undo").disabled=!history.length;$("erase").disabled=positions[active]<0||done;
  const count=positions.filter(p=>p>=0).length;$("progress").max=n+1;$("progress").value=count;$("progressLabel").textContent=`${count}/${n+1} entités localisées`;$("metadata").textContent=`${labels[board.level]} · ${n} × ${n} · ${board.clues.length} rapports de position`;
  $("candidate").setAttribute("aria-pressed",String(mode==="candidate"));persist();
+ $("trial").hidden=!!trial||done;$("trial-actions").hidden=!trial||done;
  const absolute=run.kind==="absolute";
  for(const id of ["hint","check","rays"])$(id).hidden=absolute;
  const chapter=run.kind==="campaign"?Missions.chapters[run.stage]:null;
  $("nacre-log").hidden=!chapter;
  $("arrival").textContent=chapter?.arrival||"";
+ $("recovered-file").hidden=!(chapter&&done);
+ $("evidence-title").textContent=chapter?"Ouvrir · "+chapter.evidence:"";
+ $("recovery").textContent=chapter&&done?"Archive récupérée en "+coord(positions[n])+" au croisement des émissions d’Alpha et de Beta.":"";
  $("fragment").hidden=!(chapter&&done);
  $("fragment").textContent=chapter&&done?chapter.fragment:"";
  const marathon=run.kind==="marathon";
@@ -273,7 +299,7 @@ $("hint").onclick=()=>{
  if(!hint){say("Toutes les entités sont déjà placées.");return}
  hints++;active=hint.i;pendingHint=hint;render();say("Observe "+name(hint.i)+". "+hint.why+" Touche encore Indice pour voir la case.");
 };
-$("validate").onclick=()=>{if(positions.includes(-1)){say("Localise toutes les sondes et l’anomalie avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}done=true;updateClock();recordWin();tone(true);render();say("MISSION ACCOMPLIE — Anomalie localisée !","win")};
+$("validate").onclick=()=>{if(positions.includes(-1)){say("Localise toutes les sondes et l’anomalie avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}trial=null;done=true;updateClock();recordWin();tone(true);render();say("MISSION ACCOMPLIE — Anomalie localisée !","win")};
 $("next").onclick=()=>{
  if(run.kind==="campaign")return run.stage+1<Missions.chapters.length?launch(Missions.chapter(run.stage+1)):menu(true);
  if(run.kind==="marathon")return run.stage<2?launch(Missions.marathon(run.stage+1,board.seed)):menu(true);
