@@ -1,4 +1,4 @@
-# PARADOX — Version 0.5.0
+# PARADOX — Version 0.8.0
 
 Jeu de déduction spatiale à missions procédurales. Toutes les sondes et l'anomalie sont à placer par le joueur ; aucun placement n'est fourni sur la carte.
 
@@ -65,3 +65,8 @@ En facile, les rapports géographiques suffisent à fixer deux sondes et au plus
 Aux deux niveaux supérieurs, un écart signé entre sondes renseigne une seule dimension. Par exemple, deux lignes plus bas laisse la colonne à déduire. Les indices géographiques individuels qui conservent plus de 70 % des cases libres (seuil arrondi à l’entier supérieur) sont écartés. Ces mesures décrivent les possibilités du solveur. La difficulté ressentie dépend aussi du joueur.
 
 Les nouveaux liens utilisent le moteur 5. Les graines, solutions et rapports structurés des versions 3 et 4 restent reproductibles.
+
+
+## Version 0.8
+
+La campagne dispose de sa propre sauvegarde. Les trois missions fixes de Double déduction sont accessibles dans Autres modes. Chaque canal y est indispensable à la disposition des sondes. Les parcours de reprise sont testés avec node test-progress.js.

@@ -5,7 +5,7 @@ let board,positions=[],marks=[],history=[],active=0,mode=false,signals=true,done
 const indexSymbol=i=>i>board.n?"◇":i===board.n?"✦":symbols[i],name=i=>i>board.n?"Écho":i===board.n?(board.twin?"Source":"Anomalie"):E.names[i],color=i=>i>board.n?"#ffd587":i===board.n?"#f4f1e8":colors[i],coord=p=>E.coord(p,board.n);
 function say(s,kind=""){const el=$("status");el.textContent=s;el.dataset.kind=kind}
 function newSeed(){const a=new Uint32Array(2);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(36)).join("-")}
-const modeNames={twin:"Double anomalie",classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
+const modeNames={pilot:"Double déduction",twin:"Double anomalie",classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
 let run=Missions.route(), elapsed=0, clock=null, hints=0, recorded=false;
 const journalKey="paradox.journal.1";
 let audioEnabled=false,audioContext;
@@ -37,11 +37,14 @@ function playTime(){return Math.round(elapsed+(clock===null?0:performance.now()-
 function chapterIndex(){
  const cleared=new Set(journal().filter(x=>x.kind==="campaign").map(x=>x.stage));
  const next=Missions.chapters.findIndex((_,i)=>!cleared.has(i));
- return next<0?0:next;
+ return next;
 }
 function renderJournal(){
  const entries=journal(),stage=chapterIndex();
- $("chapter-summary").textContent="Chapitre "+(stage+1)+" / "+Missions.chapters.length+" · "+Missions.chapters[stage].title;
+ const campaignSave=readSave(campaignKey)||readSave();
+ const resumeStage=campaignSave?.run?.kind==="campaign"&&!campaignSave.done?campaignSave.run.stage:null;
+ $("campaign").textContent=stage<0?"Rejouer la campagne":resumeStage!=null?"Reprendre le chapitre "+(resumeStage+1):"Lancer la campagne";
+ $("chapter-summary").textContent=stage<0?"Enquête terminée · Les onze minutes ont été reconstituées. Les huit pièces sont dans les archives.":"Chapitre "+(stage+1)+" / "+Missions.chapters.length+" · "+Missions.chapters[stage].title;
  const recovered=new Set(entries.filter(e=>e.kind==="campaign").map(e=>e.stage));
  const archive=$("nacre-archive");archive.replaceChildren();
  $("archive-count").textContent="Archives de Nacre · "+recovered.size+" / "+Missions.chapters.length;
@@ -79,15 +82,15 @@ window.addEventListener("pagehide",()=>{updateClock();persist()});
 function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
 let pinnedText=null, cluePage=0, trial=null;
 let candidates=[], filed=new Set(), generation=0, worker=null;
-const saveKey="paradox.mission.4";
+const saveKey="paradox.mission.4",campaignKey="paradox.campaign.1";
 function persist(){
  if(!board)return;
- try{localStorage.setItem(saveKey,JSON.stringify({board,positions,marks:marks.map(String),candidates,
-   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded,pinnedText,trial}));}catch{}
+ try{const encoded=JSON.stringify({board,positions,marks:marks.map(String),candidates,
+   filed:[...filed],active,mode,signals,done,run,elapsed:playTime(),hints,recorded,pinnedText,trial});if(run.kind==="campaign")localStorage.setItem(campaignKey,encoded);localStorage.setItem(saveKey,encoded);}catch{}
 }
-function readSave(){
+function readSave(key=saveKey){
  try{
-  const x=JSON.parse(localStorage.getItem(saveKey)), b=x?.board;
+  const x=JSON.parse(localStorage.getItem(key)), b=x?.board;
   if(!b||!["3","4","5"].includes(b.version)||!E.validate(b,b.solution))return null;
   const validPos=p=>Number.isInteger(p)&&(p===-1||(p>=0&&p<b.n*b.n&&b.objects[p]==null));
   if(x.positions.length!==b.solution.length||!x.positions.every(validPos)||x.marks.length!==b.solution.length||
@@ -99,7 +102,7 @@ function readSave(){
 function generateAsync(level,seed,version,signal,twin){
  if(location.protocol==="file:"||!window.Worker)return E.generate(seed,level,version,signal,twin);
  return new Promise((resolve,reject)=>{
-   worker=new Worker("generator.js?v=72");
+   worker=new Worker("generator.js?v=80");
    worker.onmessage=({data})=>data.error?reject(Error(data.error)):resolve(data.board);
    worker.onerror=()=>reject(Error("Génération interrompue. Relance la mission."));
    worker.postMessage({level,seed,version,signal,twin});
@@ -112,8 +115,11 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  const message=$("mission-menu").hidden?$("status"):$("menu-error");
  message.textContent="Préparation du plan de la station…";
  try{
-  const p=saved?.board||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal,nextRun.kind==="twin"));
+  const pilot=nextRun.kind==="pilot"?PilotBoards.find(b=>b.seed===seed):null;
+  if(nextRun.kind==="pilot"&&!pilot)throw Error("Mission pilote inconnue.");
+  const p=saved?.board||pilot||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal,nextRun.kind==="twin"));
   if(ticket!==generation)return;
+  if(board&&run.kind==="campaign")persist();
   cluePage=0;trial=saved?.trial||null;$("recovered-file").open=false;
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
   $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.solution.length).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.solution.length).fill(0n);
@@ -270,13 +276,27 @@ function render(){
  const marathon=run.kind==="marathon";
  $("brief").hidden=run.kind==="classic";
  $("brief").textContent=chapter?"Chapitre "+(run.stage+1)+" · "+chapter.title+". "+chapter.brief:
-   run.kind==="twin"?"Alpha et Beta localisent la Source. Gamma et Delta localisent l’Écho. Sélectionne une cible pour voir ses faisceaux.":marathon?"Marathon · Mission "+(run.stage+1)+" sur 3":modeNames[run.kind];
+   run.kind==="pilot"?pilotBrief(board.seed):board.twin?"Alpha et Beta localisent la Source. Gamma et Delta localisent l’Écho. Sélectionne une cible pour voir ses faisceaux.":marathon?"Marathon · Mission "+(run.stage+1)+" sur 3":modeNames[run.kind];
  $("result-details").textContent=done?Missions.duration(playTime())+" de jeu · "+hints+" indice(s) demandé(s).":"";
- $("next").textContent=chapter?(run.stage===Missions.chapters.length-1?"Terminer la campagne":"Chapitre suivant"):
+ $("next").textContent=run.kind==="pilot"?(board.seed===PilotBoards[2].seed?"Terminer les trois missions":"Double déduction suivante"):chapter?(run.stage===Missions.chapters.length-1?"Terminer la campagne":"Chapitre suivant"):
    marathon?(run.stage===2?"Terminer le marathon":"Étape suivante"):"Mission suivante";
  $("validate").disabled=done;$("hint").disabled=done;$("check").disabled=done;$("win").hidden=!done;
 }
-$("campaign").onclick=()=>launch(Missions.chapter(chapterIndex()));
+$("campaign").onclick=()=>{
+ const stage=chapterIndex(),saved=readSave(campaignKey)||readSave();
+ if(stage>=0&&saved?.run?.kind==="campaign"&&!saved.done)return start(saved.board.level,saved.board.seed,saved.board.version,saved);
+ return launch(Missions.chapter(Math.max(0,stage)));
+};
+function pilotBrief(seed){
+ const briefs={
+  "premier-echo":"1 / 3 · Premier écho. Repère la ligne de la paillasse. Depuis quelles cases le faisceau de Gamma pourrait-il croiser celui de Delta ?",
+  "miroirs":"2 / 3 · Miroirs. Compare les colonnes possibles de Gamma et Delta, puis vérifie où Alpha et Beta peuvent encore croiser leurs faisceaux.",
+  "dernier-quai":"3 / 3 · Dernier quai. Pars des deux secteurs possibles pour Epsilon. Son écart avec Gamma relie cette piste au canal de l’Écho."
+ };
+ return briefs[seed];
+}
+function launchPilot(i){return launch(["normal",PilotBoards[i].seed,{kind:"pilot"}])}
+$("pilot").onclick=()=>launchPilot(0);
 $("twin").onclick=()=>launch(["normal",newSeed(),{kind:"twin"}]);
 $("marathon").onclick=()=>launch(Missions.marathon(0,newSeed()));
 $("absolute").onclick=()=>launch(["hard",newSeed(),{kind:"absolute"}]);
@@ -286,12 +306,16 @@ for(const l of ["tutorial","easy","normal","hard"]){$("choice-"+l).onclick=()=>s
 $("change-difficulty").onclick=()=>menu(true);
 $("resume").onclick=()=>menu(false);
 $("new").onclick=()=>{
+ if(run.kind==="pilot")return launchPilot((PilotBoards.findIndex(b=>b.seed===board.seed)+1)%PilotBoards.length);
  if(run.kind==="campaign")return launch(Missions.chapter(run.stage));
  if(run.kind==="marathon")return launch(Missions.marathon(0,newSeed()));
  const level=board.level==="tutorial"?"easy":board.level;
  return launch([level,newSeed(),["custom","absolute","twin"].includes(run.kind)?run:{}]);
 };
-$("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis une graine.");return}start(seed==="incident-001"?"tutorial":board.level==="tutorial"?"easy":board.level,seed)};
+$("load").onclick=()=>{const seed=$("seed").value.trim();if(!seed){say("Saisis une graine.");return}if(["campaign","daily","tutorial"].includes(run.kind)||board.level==="tutorial"){
+ if(seed!==board.seed){say("Cette mission utilise une graine fixe.");return}
+ }
+ return start(board.level,seed,board.version,null,run)};
 $("share").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);say("Lien de la mission copié.")}catch{say("Copie l’adresse de cette page pour partager la mission.")}};
 $("notes").onclick=()=>{mode=mode!==true;render();say(mode?"Mode exclusion : marque les cases impossibles pour l’entité sélectionnée.":"Mode placement.")};
 $("candidate").onclick=()=>{mode=mode==="candidate"?false:"candidate";render();say(mode?"Hypothèses : touche une case pour ajouter ou retirer "+name(active)+".":"Mode placement.")};
@@ -309,12 +333,16 @@ $("hint").onclick=()=>{
 };
 $("validate").onclick=()=>{if(positions.includes(-1)){say("Place toutes les entités avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}trial=null;done=true;updateClock();recordWin();tone(true);render();say(board.twin?"Source et Écho localisés !":"MISSION ACCOMPLIE — Anomalie localisée !","win")};
 $("next").onclick=()=>{
+ if(run.kind==="pilot"&&board.seed===PilotBoards[2].seed)return menu(true);
  if(run.kind==="campaign")return run.stage+1<Missions.chapters.length?launch(Missions.chapter(run.stage+1)):menu(true);
  if(run.kind==="marathon")return run.stage<2?launch(Missions.marathon(run.stage+1,board.seed)):menu(true);
  return $("new").click();
 };
 document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-8]$/.test(e.key)&&+e.key<=positions.length){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
 const params=new URLSearchParams(location.search),level=params.get("level"),version=params.get("v"),seed=params.get("seed"),saved=readSave();
+if(saved?.run?.kind==="campaign"&&!readSave(campaignKey)){
+ try{localStorage.setItem(campaignKey,JSON.stringify(saved))}catch{}
+}
 if(!level&&saved)start(saved.board.level,saved.board.seed,saved.board.version,saved);
 else if((["3","4","5"].includes(version)||(version==="2"&&level==="tutorial"))&&(level==="tutorial"||Object.hasOwn(E.presets,level))){
  const options=Missions.route(Object.fromEntries(params));

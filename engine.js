@@ -62,7 +62,8 @@ function propagate(C,domains,trace=false){
  function reduce(i,next,why){if(next.length===d[i].length)return;const old=d[i];d[i]=next;change=true;if(trace)steps.push({i,removed:old.filter(p=>!next.includes(p)),remaining:next.slice(),why})}
  while(change){change=false;rounds++;
   if(d.some(a=>a.length===0))return{ok:false,domains:d,steps,rounds};
-  for(let i=0;i<M;i++)for(let j=0;j<M;j++)if(i!==j){const why=i>=n||j>=n?((i===0||i===1||j===0||j===1)?"Convergence des signaux ou case occupée":"L’anomalie doit être sur une case libre"):C.pairs[i][j].length?"Rapport de "+names[i]+" / "+names[j]+" et lignes-colonnes":"Une seule sonde par ligne et colonne ("+names[j]+")";reduce(i,d[i].filter(p=>d[j].some(q=>compatible(i,p,j,q))),trace&&i<n&&j<n?(C.pairs[i][j].map(([c])=>clueText(c)).join(" ")+" Compare avec "+names[j]+" ("+d[j].map(q=>coord(q,n)).join(", ")+") : chaque paire doit respecter les rapports et occuper deux lignes et deux colonnes distinctes.").trim():why);if(!d[i].length)return{ok:false,domains:d,steps,rounds}}
+  for(let i=0;i<M;i++)for(let j=0;j<M;j++)if(i!==j){const why=i>=n||j>=n?(Math.floor(Math.min(i,j)/2)===Math.max(i,j)-n&&Math.min(i,j)<n?
+    "Le faisceau de "+names[Math.min(i,j)]+" doit atteindre "+(Math.max(i,j)===n?"la Source":"l’Écho")+". Compare sa direction, sa portée et les obstacles":"Deux entités ne peuvent pas occuper la même case"):C.pairs[i][j].length?"Rapport de "+names[i]+" / "+names[j]+" et lignes-colonnes":"Une seule sonde par ligne et colonne ("+names[j]+")";reduce(i,d[i].filter(p=>d[j].some(q=>compatible(i,p,j,q))),trace&&i<n&&j<n?(C.pairs[i][j].map(([c])=>clueText(c)).join(" ")+" Compare avec "+names[j]+" ("+d[j].map(q=>coord(q,n)).join(", ")+") : chaque paire doit respecter les rapports et occuper deux lignes et deux colonnes distinctes.").trim():why);if(!d[i].length)return{ok:false,domains:d,steps,rounds}}
   for(const axis of [row,col])for(let k=0;k<n;k++){const who=range(n).filter(i=>d[i].some(p=>axis(p,n)===k));if(!who.length)return{ok:false,domains:d,steps,rounds};if(who.length===1){const i=who[0];reduce(i,d[i].filter(p=>axis(p,n)===k),"Seule sonde possible pour "+(axis===row?"la ligne ":"la colonne ")+(k+1))}}
  }
  return{ok:true,complete:d.every(a=>a.length===1),domains:d,values:d.map(a=>a.length===1?a[0]:-1),steps,rounds};
@@ -190,7 +191,7 @@ function generate(seed,level="normal",version=VERSION,signal="standard",twin=fal
 // Replay eliminations from the player's placements, without reading the hidden solution.
 function explain(B,placements){
  const C=context(B), empty=i=>placements[i]==null||placements[i]<0;
- const label=i=>i>=B.n?"l’anomalie":names[i];
+ const label=i=>i<B.n?names[i]:B.twin?(i===B.n?"la Source":"l’Écho"):"l’anomalie";
  const domains=C.initial.map((cells,i)=>empty(i)?cells:cells.filter(p=>p===placements[i]));
  for(let i=0;i<B.n;i++)if(empty(i)&&domains[i].length===1){
    return {i,p:domains[i][0],why:C.unaryClues[i].map(clueText).join(" ")+" Une seule case libre satisfait ces rapports."};
@@ -200,6 +201,10 @@ function explain(B,placements){
  if(!step)return null;
  const before=step.removed.concat(step.remaining).sort((a,b)=>a-b);
  const choices=before.length<=5?before.map(p=>coord(p,B.n)).join(", "):before.length+" cases";
+ if(B.twin&&step.why.startsWith("Le faisceau de ")){
+  const ruledOut=step.removed.map(p=>coord(p,B.n)).join(", ");
+  return {i:step.i,p:step.remaining[0],why:step.why+". Pour "+label(step.i)+", cela élimine "+ruledOut+"."};
+ }
  return {i:step.i,p:step.remaining[0],why:"Pour "+label(step.i)+", il restait "+choices+". "+step.why+"."};
 }
 function tutorial(){return{version:VERSION,n:5,seed:"incident-001",level:"tutorial",zones:[0,0,0,1,1,0,0,0,1,1,2,2,3,3,1,2,2,3,3,3,2,2,3,3,3],objects:range(25).map(i=>({0:1,3:0,11:2,19:3,22:4})[i]??null),directions:["S","W"],clues:[{type:"objectOffset",a:0,o:0,dr:1,dc:-1},{type:"zone",a:1,z:3},{type:"objectOffset",a:2,o:0,dr:0,dc:1},{type:"offset",a:3,b:4,dr:1,dc:1},{type:"zone",a:4,z:2},{type:"near",a:3,o:4}],solution:[7,13,4,21,15,12]}}

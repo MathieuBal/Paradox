@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const E = require("./engine.js");
 // Independent enumeration: direct rules, no calls to the production solver.
-function brute(B, convergence=true, limit=2) {
+function brute(B, convergence=true, limit=2, channel="both") {
  const n=B.n, R=p=>Math.floor(p/n), C=p=>p%n, D=(p,q)=>Math.abs(R(p)-R(q))+Math.abs(C(p)-C(q)), all=Array.from({length:n*n},(_,i)=>i).filter(i=>B.objects[i]==null);
  const v=Array(n).fill(-1);let found=0;
  function clue(c){
@@ -29,7 +29,13 @@ function brute(B, convergence=true, limit=2) {
  }
  function visit(i,rows,cols){
   if(found>=limit)return;
-  if(i===n){if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&alpha(t)&&signal(v[1],B.directions[1],t)){if(B.twin){for(const u of all)if(u!==t&&!v.includes(u)&&signal(v[2],B.directions[2],u)&&signal(v[3],B.directions[3],u))found++;}else found++;if(found>=limit)return}return}
+  if(i===n){
+   if(channel!=="both"){
+    const k=channel==="source"?0:2;
+    if(all.some(t=>!v.includes(t)&&signal(v[k],B.directions[k],t)&&signal(v[k+1],B.directions[k+1],t)))found++;
+    return;
+   }
+   if(!convergence){found++;return}for(const t of all)if(!v.includes(t)&&alpha(t)&&signal(v[1],B.directions[1],t)){if(B.twin){for(const u of all)if(u!==t&&!v.includes(u)&&signal(v[2],B.directions[2],u)&&signal(v[3],B.directions[3],u))found++;}else found++;if(found>=limit)return}return}
   for(const p of all){const r=1<<R(p),c=1<<C(p);if((r&rows)||(c&cols))continue;v[i]=p;if(B.clues.every(clue))visit(i+1,rows|r,cols|c);v[i]=-1;if(found>=limit)return}
  }
  visit(0,0,0);return found;
@@ -51,3 +57,11 @@ console.log("225 missions à signal alternatif validées.");
 
 for(let i=0;i<60;i++){const b=E.generate("double-"+i,"normal",E.VERSION,"standard",true);assert.equal(brute(b),1);assert.deepEqual(E.solve(b).values,b.solution);assert(E.validate(b,b.solution));const swapped=b.solution.slice();[swapped[b.n],swapped[b.n+1]]=[swapped[b.n+1],swapped[b.n]];assert(!E.validate(b,swapped));}
 console.log("60 missions à deux anomalies validées.");
+
+for(const board of require("./pilots")){
+ assert.equal(brute(board),1);
+ assert.equal(brute(board,true,2,"source"),2);
+ assert.equal(brute(board,true,2,"echo"),2);
+ assert.deepEqual(E.solve(board).values,board.solution);
+}
+console.log("Trois doubles déductions vérifiées avec chaque canal retiré séparément.");
