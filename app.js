@@ -5,7 +5,7 @@ let board,positions=[],marks=[],history=[],active=0,mode=false,signals=true,done
 const indexSymbol=i=>i>board.n?"◇":i===board.n?"✦":symbols[i],name=i=>i>board.n?"Écho":i===board.n?(board.twin?"Source":"Anomalie"):E.names[i],color=i=>i>board.n?"#ffd587":i===board.n?"#f4f1e8":colors[i],coord=p=>E.coord(p,board.n);
 function say(s,kind=""){const el=$("status");el.textContent=s;el.dataset.kind=kind}
 function newSeed(){const a=new Uint32Array(2);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(36)).join("-")}
-const modeNames={pilot:"Double déduction",twin:"Double anomalie",classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
+const modeNames={training:"Prise en main",pilot:"Double déduction",twin:"Double anomalie",classic:"Classique",daily:"Anomalie du jour",campaign:"Campagne",marathon:"Marathon",custom:"Personnalisée",absolute:"Expert absolu"};
 let run=Missions.route(), elapsed=0, clock=null, hints=0, recorded=false;
 const journalKey="paradox.journal.1";
 let audioEnabled=false,audioContext;
@@ -79,7 +79,7 @@ function recordWin(){
 function launch([level,seed,options]){return start(level,seed,E.VERSION,null,options)}
 document.addEventListener("visibilitychange",()=>{updateClock();persist()});
 window.addEventListener("pagehide",()=>{updateClock();persist()});
-function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$("choice-"+(board?.level||"easy")).focus()}else{$("change-difficulty").focus()}}
+function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$(board?"choice-"+board.level:"training").focus()}else{$("change-difficulty").focus()}}
 let pinnedText=null, cluePage=0, trial=null;
 let candidates=[], filed=new Set(), generation=0, worker=null;
 const saveKey="paradox.mission.4",campaignKey="paradox.campaign.1";
@@ -117,7 +117,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
  try{
   const pilot=nextRun.kind==="pilot"?PilotBoards.find(b=>b.seed===seed):null;
   if(nextRun.kind==="pilot"&&!pilot)throw Error("Mission pilote inconnue.");
-  const p=saved?.board||pilot||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal,nextRun.kind==="twin"));
+  const p=saved?.board||(nextRun.kind==="training"?TrainingBoard:null)||pilot||(level==="tutorial"?E.tutorial():await generateAsync(level,seed,version,nextRun.signal,nextRun.kind==="twin"));
   if(ticket!==generation)return;
   if(board&&run.kind==="campaign")persist();
   cluePage=0;trial=saved?.trial||null;$("recovered-file").open=false;
@@ -132,7 +132,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
   if(run.kind!=="classic")url.searchParams.set("kind",run.kind);
   if(run.stage)url.searchParams.set("stage",run.stage);
   if(run.signal!=="standard")url.searchParams.set("signal",run.signal);
-  window.history.replaceState(null,"",url);render();menu(false);
+  window.history.replaceState(null,"",url);$("lesson-feedback").textContent="";render();menu(false);
   say(saved?"Mission reprise au dernier coup.":"Choisis une sonde, lis son rapport, puis touche une case libre.");
  }catch(e){if(ticket===generation)message.textContent=e.message}
  finally{if(ticket===generation){worker?.terminate();worker=null}}
@@ -152,7 +152,25 @@ $("drop-trial").onclick=()=>{
 };
 $("cycle-clue").onclick=()=>{cluePage++;render();$("cycle-clue").focus({preventScroll:true})};
 function select(i){if(active!==i){cluePage=0;pendingHint=null;pinnedText=null;}active=i;render()}
+const lessonSteps=[
+ [0,"L’antenne est en B1. Touche la case juste à sa gauche pour y poser Alpha.","Reste sur la ligne 1 et recule d’une colonne depuis B1."],
+ [1,"La paillasse est en C2. Pose Beta juste en dessous.","Pars de C2 et descends d’une case dans la même colonne."],
+ [4,"Alpha éclaire vers le bas, Beta vers la gauche. Touche la case où leurs deux traits se croisent.","Suis la colonne d’Alpha jusqu’à la ligne de Beta."],
+ [2,"La Source est trouvée. Pose Gamma juste à droite de la paillasse.","Repère C2 et avance d’une case sur cette ligne."],
+ [3,"Pose Delta juste à droite de la caisse.","La caisse est en A4. Reste sur la ligne 4."],
+ [5,"À toi de retrouver l’Écho au croisement des faisceaux de Gamma et Delta.","Suis le trait qui descend de Gamma jusqu’à celui qui part de Delta."]
+];
+function lessonIndex(){return lessonSteps.findIndex(([i])=>positions[i]<0)}
 function place(p){
+ if(run.kind==="training"){
+  const step=lessonSteps[lessonIndex()];
+  if(done||!step)return;
+  const [i,,tip]=step;
+  if(p!==board.solution[i]){
+   $("lesson-feedback").textContent=coord(p)+" · "+tip;return;
+  }
+  positions[i]=p;tone();$("lesson-feedback").textContent="";render();return;
+ }
  if(!board||done)return;if(board.objects[p]!=null){say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
  if(mode==="candidate"){
    if(positions.includes(p)){say("Choisis une case libre pour y noter une hypothèse.");return}
@@ -184,6 +202,14 @@ function pin(entry,fromJournal){
 }
 $("unpin").onclick=()=>{pinnedText=null;render();$("focus-reports").querySelector("button")?.focus({preventScroll:true})};
 function render(){
+ const guided=run.kind==="training";
+ $("game").classList.toggle("guided",guided);$("lesson").hidden=!guided;
+ if(guided){
+  const step=lessonIndex();
+  active=step<0?board.n+1:lessonSteps[step][0];
+  $("lesson-title").textContent=step<0?"Source et Écho retrouvés":"Étape "+(step+1)+"/6 · "+name(active);
+  $("lesson-task").textContent=step<0?(done?"Prise en main terminée.":"Valide ta mission sous la grille."):lessonSteps[step][1];
+ }
  const n=board.n,N=n*n,grid=$("map");grid.replaceChildren();grid.style.setProperty("--n",n);
  const entries=board.clues.map(c=>({clue:c,i:c.a,related:c.b,txt:E.clueText(c,board.version)}));
  entries.push({i:0,txt:E.beamLabel(board,0).text},{i:1,txt:E.beamLabel(board,1).text},{i:n,related:0,other:1,txt:"L’anomalie se trouve sur une case libre où les deux signaux se croisent."});
@@ -280,6 +306,8 @@ function render(){
  $("result-details").textContent=done?Missions.duration(playTime())+" de jeu · "+hints+" indice(s) demandé(s).":"";
  $("next").textContent=run.kind==="pilot"?(board.seed===PilotBoards[2].seed?"Terminer les trois missions":"Double déduction suivante"):chapter?(run.stage===Missions.chapters.length-1?"Terminer la campagne":"Chapitre suivant"):
    marathon?(run.stage===2?"Terminer le marathon":"Étape suivante"):"Mission suivante";
+ if(guided)$("next").textContent="Jouer à Premier écho";
+ $("validate").hidden=guided&&(done||lessonIndex()>=0);
  $("validate").disabled=done;$("hint").disabled=done;$("check").disabled=done;$("win").hidden=!done;
 }
 $("campaign").onclick=()=>{
@@ -296,6 +324,7 @@ function pilotBrief(seed){
  return briefs[seed];
 }
 function launchPilot(i){return launch(["normal",PilotBoards[i].seed,{kind:"pilot"}])}
+$("training").onclick=()=>launch(["easy",TrainingBoard.seed,{kind:"training"}]);
 $("pilot").onclick=()=>launchPilot(0);
 $("twin").onclick=()=>launch(["normal",newSeed(),{kind:"twin"}]);
 $("marathon").onclick=()=>launch(Missions.marathon(0,newSeed()));
@@ -333,12 +362,13 @@ $("hint").onclick=()=>{
 };
 $("validate").onclick=()=>{if(positions.includes(-1)){say("Place toutes les entités avant de valider.");return}if(!E.validate(board,positions)){say("La configuration contredit au moins une règle ou un rapport.","error");return}trial=null;done=true;updateClock();recordWin();tone(true);render();say(board.twin?"Source et Écho localisés !":"MISSION ACCOMPLIE — Anomalie localisée !","win")};
 $("next").onclick=()=>{
+ if(run.kind==="training")return launchPilot(0);
  if(run.kind==="pilot"&&board.seed===PilotBoards[2].seed)return menu(true);
  if(run.kind==="campaign")return run.stage+1<Missions.chapters.length?launch(Missions.chapter(run.stage+1)):menu(true);
  if(run.kind==="marathon")return run.stage<2?launch(Missions.marathon(run.stage+1,board.seed)):menu(true);
  return $("new").click();
 };
-document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(/^[1-8]$/.test(e.key)&&+e.key<=positions.length){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
+document.addEventListener("keydown",e=>{if(!board||!$("mission-menu").hidden||e.ctrlKey||e.metaKey||e.altKey||["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName))return;if(run.kind==="training"&&!e.key.startsWith("Arrow"))return;if(/^[1-8]$/.test(e.key)&&+e.key<=positions.length){e.preventDefault();select(+e.key-1)}else if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();$("erase").click()}else if(e.key.toLowerCase()==="n")$("notes").click();else if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)&&e.target.dataset.cell!=null){e.preventDefault();const p=+e.target.dataset.cell,n=board.n,dr=e.key==="ArrowUp"?-1:e.key==="ArrowDown"?1:0,dc=e.key==="ArrowLeft"?-1:e.key==="ArrowRight"?1:0,r=Math.floor(p/n)+dr,c=p%n+dc;if(r>=0&&r<n&&c>=0&&c<n)$("map").querySelector(`[data-cell="${r*n+c}"]`)?.focus()}});
 const params=new URLSearchParams(location.search),level=params.get("level"),version=params.get("v"),seed=params.get("seed"),saved=readSave();
 if(saved?.run?.kind==="campaign"&&!readSave(campaignKey)){
  try{localStorage.setItem(campaignKey,JSON.stringify(saved))}catch{}

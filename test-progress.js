@@ -39,6 +39,14 @@ async function test(){
  for(const pilot of require("./pilots")){assert.equal(saved().board.seed,pilot.seed);win(ui);await ui.next.click()}
  ui=boot("https://example.test/?v=5&level=normal&seed=miroirs&kind=pilot");
  assert.equal(saved().board.seed,"miroirs");assert.equal(saved().run.kind,"pilot");
+ await ui.training.click();
+ assert.deepEqual(saved().positions,Array(6).fill(-1));
+ ui.map.children[1].click();assert.match(ui["lesson-feedback"].textContent,/B1/);
+ for(const p of [0,10,8,7,13,15]){
+  ui.map.children[p].click();ui=boot();
+ }
+ assert.equal(ui.validate.hidden,false);ui.validate.click();assert.equal(ui.win.hidden,false);
+ await ui.next.click();assert.equal(saved().board.seed,"premier-echo");
  console.log("Campagne, reprise, graine double et trois pilotes validés.");
 }
 test().catch(error=>{console.error(error);process.exitCode=1});

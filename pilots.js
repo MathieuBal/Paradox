@@ -290,3 +290,17 @@ const PilotBoards = [
  }
 ];
 if(typeof module!=="undefined")module.exports=PilotBoards;
+
+const TrainingBoard={
+ version:"5",n:4,level:"easy",seed:"prise-en-main",twin:true,
+ zones:[0,0,1,1,0,0,1,1,2,2,3,3,2,2,3,3],
+ objects:[null,0,null,null,null,null,1,null,null,null,null,null,4,null,null,null],
+ directions:["S","W","S","E"],
+ clues:[
+  {type:"objectOffset",a:0,o:0,dr:0,dc:-1},
+  {type:"objectOffset",a:1,o:1,dr:1,dc:0},
+  {type:"objectOffset",a:2,o:1,dr:0,dc:1},
+  {type:"objectOffset",a:3,o:4,dr:0,dc:1}
+ ],
+ solution:[0,10,7,13,8,15]
+};
