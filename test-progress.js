@@ -35,6 +35,14 @@ async function test(){
  assert.match(ui["chapter-summary"].textContent,/terminée/);
  await ui.twin.click();const board=saved().board;await ui.load.click();
  assert.equal(saved().run.kind,"twin");assert.deepEqual(saved().board,board);
+ await ui.investigate.click();
+ assert.equal(saved().active,0);
+ assert.ok(ui.map.children[10].classes.has("contact-cell"));
+ ui.map.children[10].click();assert.match(ui["contact-note"].textContent,/refroidisseur/);
+ for(const [i,p] of [[0,17],[1,13],[5,12],[2,5],[3,1],[6,6],[4,24]]){
+  assert.equal(saved().active,i);ui.map.children[p].click();
+ }
+ assert.equal(ui.win.hidden,false);assert.equal(saved().hints,0);
  await ui.pilot.click();
  for(const pilot of require("./pilots")){assert.equal(saved().board.seed,pilot.seed);win(ui);await ui.next.click()}
  ui=boot("https://example.test/?v=5&level=normal&seed=miroirs&kind=pilot");
@@ -53,6 +61,15 @@ async function test(){
  }
  assert.equal(ui.validate.hidden,true);assert.equal(ui.win.hidden,false);
  await ui.next.click();assert.equal(saved().board.seed,"premier-echo");
+ ui=boot("https://example.test/?mission=premier-echo");
+ assert.deepEqual(saved().positions,Array(7).fill(-1));
+ await ui["choice-easy"].click();
+ for(let move=0;move<saved().positions.length;move++){
+  const state=saved(),p=state.board.solution[state.active];
+  if(state.active<state.board.n)assert.ok(ui.map.children[p].classes.has("contact-cell"));
+  ui.map.children[p].click();
+ }
+ assert.equal(ui.win.hidden,false);assert.equal(saved().hints,0);
  console.log("Campagne, reprise, graine double et trois pilotes validés.");
 }
 test().catch(error=>{console.error(error);process.exitCode=1});

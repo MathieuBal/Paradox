@@ -80,6 +80,7 @@ function launch([level,seed,options]){return start(level,seed,E.VERSION,null,opt
 document.addEventListener("visibilitychange",()=>{updateClock();persist()});
 window.addEventListener("pagehide",()=>{updateClock();persist()});
 function menu(open){$("mission-menu").hidden=!open;$("game").hidden=open;$("resume").hidden=!board;$("menu-error").textContent="";updateClock();if(open){renderJournal();$(board?"choice-"+board.level:"training").focus()}else{$("change-difficulty").focus()}}
+let survey=null;
 let pinnedText=null, cluePage=0, trial=null;
 let candidates=[], filed=new Set(), generation=0, worker=null;
 const saveKey="paradox.mission.4",campaignKey="paradox.campaign.1";
@@ -124,10 +125,11 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
   pinnedText=typeof saved?.pinnedText==="string"?saved.pinnedText:null;run=nextRun;elapsed=Number(saved?.elapsed)||0;clock=null;hints=Number(saved?.hints)||0;recorded=!!saved?.recorded;
   $("nacre-log").open=false;board=p;positions=saved?.positions||Array(p.solution.length).fill(-1);marks=saved?saved.marks.map(BigInt):Array(p.solution.length).fill(0n);
   candidates=saved?.candidates||Array(p.n*p.n).fill(0);filed=new Set(saved?.filed);
-  history=[];active=saved?.active??(p.level==="tutorial"?0:E.startingProbe(p));mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
+  survey=contactSheet(p,run.kind);surveyMessage("");
+  history=[];active=saved?.active??(survey&&p.seed==="premier-echo"?0:null)??(p.level==="tutorial"?0:E.startingProbe(p));mode=saved?.mode||false;signals=run.kind==="absolute"?false:(saved?.signals??true);
   done=!!saved?.done&&E.validate(p,positions);pendingHint=null;
   $("seed").value=p.seed;$("current-difficulty").textContent=labels[level];
-  const url=new URL(location.href);url.searchParams.set("v",p.version);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);
+  const url=new URL(location.href);url.searchParams.delete("mission");url.searchParams.set("v",p.version);url.searchParams.set("level",p.level);url.searchParams.set("seed",p.seed);
   for(const key of ["kind","stage","signal"])url.searchParams.delete(key);
   if(run.kind!=="classic")url.searchParams.set("kind",run.kind);
   if(run.stage)url.searchParams.set("stage",run.stage);
@@ -151,7 +153,32 @@ $("drop-trial").onclick=()=>{
  render();say("Grille et notes restaurées.");
 };
 $("cycle-clue").onclick=()=>{cluePage++;render();$("cycle-clue").focus({preventScroll:true})};
-function select(i){if(active!==i){cluePage=0;pendingHint=null;pinnedText=null;}active=i;render()}
+// A recorded contact gives two locations. Only public rules are used to check a move.
+function contactSheet(b,kind){
+ if(kind==="pilot"&&b.seed==="premier-echo")return [[10,17],[7,13],[5,8],[1,2],[21,24]];
+ if(b.level!=="easy"||!["classic","campaign","custom"].includes(kind))return null;
+ const first=E.startingProbe(b),order=[first,...Array.from({length:b.n},(_,i)=>i).filter(i=>i!==first)];
+ const sheet=[],previous=[];
+ for(const i of order){
+  const home=b.solution[i],empty=Array(b.solution.length).fill(-1);
+  const free=b.objects.map((_,p)=>p).filter(p=>p!==home&&b.objects[p]==null);
+  const decoy=free.find(p=>{
+   empty[i]=p;
+   return previous.some(q=>Math.floor(q/b.n)===Math.floor(p/b.n)||q%b.n===p%b.n)||!!E.conflict(b,empty);
+  });
+  sheet[i]=[home,decoy??free[0]].sort((a,b)=>a-b);previous.push(home);
+ }
+ return sheet;
+}
+function nextContact(){
+ for(let target=board.n;target<positions.length;target++){
+  const first=(target-board.n)*2;
+  if(positions[target]<0&&positions[first]>=0&&positions[first+1]>=0)return target;
+ }
+ return positions.findIndex(p=>p<0);
+}
+function surveyMessage(text){$("contact-note").textContent=text}
+function select(i){if(active!==i){surveyMessage("");cluePage=0;pendingHint=null;pinnedText=null;}active=i;render()}
 let showLanding=false;
 const lessonSteps=[
  [0,"Pose Alpha dans le cercle, juste à gauche de l’antenne."],
@@ -177,12 +204,30 @@ function place(p){
   if(lessonIndex()<0){$("validate").onclick();return}
   tone();render();return;
  }
- if(!board||done)return;if(board.objects[p]!=null){say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
+ if(!board||done)return;if(board.objects[p]!=null){if(survey)surveyMessage("Cet équipement occupe déjà la case.");say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
  if(mode==="candidate"){
    if(positions.includes(p)){say("Choisis une case libre pour y noter une hypothèse.");return}
    snapshot();candidates[p]^=1<<active;render();say("Hypothèse mise à jour pour "+name(active)+" en "+coord(p)+".");return;
  }
  if(mode){snapshot();marks[active]^=1n<<BigInt(p);say("Annotation mise à jour.");render();return}
+ if(survey&&positions[active]!==p){
+  if(active<board.n&&!survey[active].includes(p)){surveyMessage("Le radar a enregistré cette sonde sur l’une des deux cases cerclées.");return}
+  if(positions.includes(p)){surveyMessage("Cette case est déjà occupée par "+name(positions.indexOf(p))+".");return}
+  if(active>=board.n){
+   const first=(active-board.n)*2;
+   if(positions[first]<0||positions[first+1]<0){surveyMessage("Place d’abord "+name(first)+" et "+name(first+1)+" pour croiser leurs signaux.");return}
+  }
+  const proposed=positions.slice();proposed[active]=p;
+  if(board.seed==="premier-echo"&&active===0&&Math.floor(p/board.n)!==Math.floor(board.objects.indexOf(3)/board.n)){
+   surveyMessage("Le refroidisseur est sur la ligne 4. Regarde l’autre cercle.");return;
+  }
+  const problem=E.conflict(board,proposed);
+  if(problem){surveyMessage(problem);return}
+  snapshot();positions=proposed;pinnedText=null;cluePage=0;
+  const last=name(active),next=nextContact();if(next>=0)active=next;
+  surveyMessage(last+" en "+coord(p)+".");tone();render();
+  if(next<0)$("validate").onclick();return;
+ }
  const occupant=positions.indexOf(p);if(occupant>=0){select(occupant);say(name(occupant)+" sélectionnée. Touche une autre case pour la déplacer, ou Effacer.");return}
  snapshot();positions[active]=p;tone();say(name(active)+" placée en "+coord(p)+" (non vérifiée).");render();
 }
@@ -232,6 +277,7 @@ function render(){
  const page=cluePage%Math.max(1,availableClues.length);
  const visibleReport=pinned||availableClues[page];
  const references=!guided&&visibleReport?reportReferences(visibleReport):new Map();
+ if(survey&&board.seed==="premier-echo"&&active===0&&!pinned){references.clear();references.set(board.objects.indexOf(3),"Refroidisseur")}
  const anchor=guided&&step>=0?board.clues.find(clue=>clue.a===active):null;
  $("pinned").hidden=!pinned;
  $("pinned-text").textContent=pinned?.txt||"";
@@ -246,6 +292,19 @@ function render(){
  const pair=board.twin&&[2,3,n+1].includes(active)?[2,3]:[0,1];
  $("beam-one").textContent="■ "+E.names[pair[0]];$("beam-two").textContent="■ "+E.names[pair[1]];
  const rays=pair.map(i=>signals&&positions[i]>=0?E.beam(board,i,positions[i]):[]);
+ $("contacts").hidden=!survey||done;
+ if(survey){
+  $("contact-title").textContent=active<n?"Radar · "+name(active):"Localiser "+name(active);
+  $("contact-rule").textContent=active>=n?"Touche la case où les deux faisceaux se croisent.":
+   board.seed==="premier-echo"?[
+    "Le radar hésite entre les deux cercles. Le mécanicien a aperçu Alpha sur la ligne du refroidisseur. Touche le bon cercle.",
+    "Une seule sonde par colonne. Lequel des deux cercles laisse sa colonne à Alpha ?",
+    "Gamma était sur la ligne de la paillasse. Parmi les deux cercles, quelle colonne est encore libre ?",
+    "Delta occupe sa propre colonne. Regarde les sondes déjà posées avant de choisir.",
+    "Il reste une sonde. Cherche la ligne et la colonne encore libres."
+   ][active]:
+   "Deux échos radar. Utilise le rapport et garde une seule sonde par ligne et par colonne.";
+ }
  const selected=positions[active];
  for(let p=0;p<N;p++){
   const r=Math.floor(p/n),c=p%n,z=board.zones[p],o=board.objects[p],i=positions.indexOf(p),b=document.createElement("button");b.type="button";b.className="cell";b.dataset.cell=p;b.dataset.zone=z;
@@ -286,6 +345,9 @@ function render(){
   if(guided&&step>=0&&(step===0||showLanding)&&p===board.solution[active]){
    b.classList.add("lesson-landing");b.setAttribute("aria-label",b.getAttribute("aria-label")+", toucher ici pour placer "+name(active));
   }
+  if(survey&&active<n&&survey[active].includes(p)){
+   b.classList.add("contact-cell");b.setAttribute("aria-label",b.getAttribute("aria-label")+", écho radar");
+  }
   if(references.has(p)){b.classList.add("referenced");b.setAttribute("aria-label",b.getAttribute("aria-label")+", repère du rapport")}
   b.onclick=()=>{place(p);grid.querySelector(`[data-cell="${p}"]`)?.focus({preventScroll:true})};grid.append(b);
  }
@@ -299,7 +361,7 @@ function render(){
  const focus=$("focus-reports");focus.replaceChildren();
  $("cycle-clue").hidden=availableClues.length<2;
  $("cycle-clue").textContent="Suivant · "+(page+1)+"/"+availableClues.length;
- $("focus-panel").hidden=!!pinned;
+ $("focus-panel").hidden=!!pinned||!!survey&&board.seed==="premier-echo";
  for(const c of availableClues.slice(page,page+1)){const li=document.createElement("li");const link=document.createElement("button");link.type="button";link.className="focus-clue";link.textContent=c.txt;link.onclick=()=>pin(c,false);li.append(link);li.classList.toggle("filed",filed.has(c.txt));focus.append(li)}if(!focus.children.length){const li=document.createElement("li");li.textContent="Aucun rapport direct : recoupe les autres rapports et les lignes et colonnes.";focus.append(li)}
  $("focus-title").textContent="Rapports · "+name(active);$("focus-title").style.color=color(active);
  $("starter").hidden=board.level!=="tutorial";$("selection").textContent=name(active)+" · "+(positions[active]<0?"à placer":coord(positions[active]));$("selection").style.color=color(active);
@@ -343,6 +405,7 @@ function pilotBrief(seed){
 }
 function launchPilot(i){return launch(["normal",PilotBoards[i].seed,{kind:"pilot"}])}
 $("training").onclick=()=>launch(["easy",TrainingBoard.seed,{kind:"training"}]);
+$("investigate").onclick=()=>launchPilot(0);
 $("pilot").onclick=()=>launchPilot(0);
 $("twin").onclick=()=>launch(["normal",newSeed(),{kind:"twin"}]);
 $("marathon").onclick=()=>launch(Missions.marathon(0,newSeed()));
@@ -391,7 +454,8 @@ const params=new URLSearchParams(location.search),level=params.get("level"),vers
 if(saved?.run?.kind==="campaign"&&!readSave(campaignKey)){
  try{localStorage.setItem(campaignKey,JSON.stringify(saved))}catch{}
 }
-if(!level&&saved)start(saved.board.level,saved.board.seed,saved.board.version,saved);
+if(params.get("mission")==="premier-echo")launchPilot(0);
+else if(!level&&saved)start(saved.board.level,saved.board.seed,saved.board.version,saved);
 else if((["3","4","5"].includes(version)||(version==="2"&&level==="tutorial"))&&(level==="tutorial"||Object.hasOwn(E.presets,level))){
  const options=Missions.route(Object.fromEntries(params));
  const matches=saved&&JSON.stringify(Missions.route(saved.run))===JSON.stringify(options)&&saved.board.level===level&&saved.board.seed===seed&&saved.board.version===version;
