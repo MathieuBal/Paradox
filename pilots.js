@@ -292,7 +292,7 @@ const PilotBoards = [
 if(typeof module!=="undefined")module.exports=PilotBoards;
 
 const TrainingBoard={
- version:"5",n:4,level:"easy",seed:"prise-en-main",twin:true,
+ version:"5",n:4,level:"easy",seed:"premiers-signaux",twin:true,
  zones:[0,0,1,1,0,0,1,1,2,2,3,3,2,2,3,3],
  objects:[null,0,null,null,null,null,1,null,null,null,null,null,4,null,null,null],
  directions:["S","W","S","E"],

@@ -132,7 +132,7 @@ async function start(level,seed,version=E.VERSION,saved=null,options={}){
   if(run.kind!=="classic")url.searchParams.set("kind",run.kind);
   if(run.stage)url.searchParams.set("stage",run.stage);
   if(run.signal!=="standard")url.searchParams.set("signal",run.signal);
-  window.history.replaceState(null,"",url);$("lesson-feedback").textContent="";render();menu(false);
+  window.history.replaceState(null,"",url);showLanding=false;$("lesson-feedback").textContent="";render();menu(false);
   say(saved?"Mission reprise au dernier coup.":"Choisis une sonde, lis son rapport, puis touche une case libre.");
  }catch(e){if(ticket===generation)message.textContent=e.message}
  finally{if(ticket===generation){worker?.terminate();worker=null}}
@@ -152,24 +152,30 @@ $("drop-trial").onclick=()=>{
 };
 $("cycle-clue").onclick=()=>{cluePage++;render();$("cycle-clue").focus({preventScroll:true})};
 function select(i){if(active!==i){cluePage=0;pendingHint=null;pinnedText=null;}active=i;render()}
+let showLanding=false;
 const lessonSteps=[
- [0,"L’antenne est en B1. Touche la case juste à sa gauche pour y poser Alpha.","Reste sur la ligne 1 et recule d’une colonne depuis B1."],
- [1,"La paillasse est en C2. Pose Beta juste en dessous.","Pars de C2 et descends d’une case dans la même colonne."],
- [4,"Alpha éclaire vers le bas, Beta vers la gauche. Touche la case où leurs deux traits se croisent.","Suis la colonne d’Alpha jusqu’à la ligne de Beta."],
- [2,"La Source est trouvée. Pose Gamma juste à droite de la paillasse.","Repère C2 et avance d’une case sur cette ligne."],
- [3,"Pose Delta juste à droite de la caisse.","La caisse est en A4. Reste sur la ligne 4."],
- [5,"À toi de retrouver l’Écho au croisement des faisceaux de Gamma et Delta.","Suis le trait qui descend de Gamma jusqu’à celui qui part de Delta."]
+ [0,"Pose Alpha dans le cercle, juste à gauche de l’antenne."],
+ [1,"Alpha éclaire vers le bas. Pose Beta juste sous la paillasse."],
+ [4,"Les deux sondes éclairent une même case. Touche leur croisement pour y marquer la Source."],
+ [2,"Source trouvée ! Pour chercher l’Écho, pose Gamma juste à droite de la paillasse."],
+ [3,"Pose Delta juste à droite de la caisse."],
+ [5,"Où les deux nouveaux traits se croisent-ils ? Touche cette case pour marquer l’Écho."]
 ];
+$("lesson-help").onclick=()=>{showLanding=true;render()};
 function lessonIndex(){return lessonSteps.findIndex(([i])=>positions[i]<0)}
 function place(p){
  if(run.kind==="training"){
   const step=lessonSteps[lessonIndex()];
   if(done||!step)return;
-  const [i,,tip]=step;
+  const [i]=step;
   if(p!==board.solution[i]){
-   $("lesson-feedback").textContent=coord(p)+" · "+tip;return;
+   showLanding=true;render();
+   const reason=board.objects[p]!=null?"L’équipement occupe cette case.":positions.includes(p)?"Cette case est déjà occupée.":i>=board.n?"Les deux traits ne se croisent pas ici.":"Regarde la flèche sur l’équipement.";
+   $("lesson-feedback").textContent=coord(p)+" · "+reason+" Touche le cercle.";return;
   }
-  positions[i]=p;tone();$("lesson-feedback").textContent="";render();return;
+  positions[i]=p;showLanding=false;$("lesson-feedback").textContent="";
+  if(lessonIndex()<0){$("validate").onclick();return}
+  tone();render();return;
  }
  if(!board||done)return;if(board.objects[p]!=null){say(E.objectNames[board.objects[p]]+" : cette case est occupée par un équipement.");return}
  if(mode==="candidate"){
@@ -204,10 +210,11 @@ $("unpin").onclick=()=>{pinnedText=null;render();$("focus-reports").querySelecto
 function render(){
  const guided=run.kind==="training";
  $("game").classList.toggle("guided",guided);$("lesson").hidden=!guided;
+ const step=guided?lessonIndex():-1;
  if(guided){
-  const step=lessonIndex();
+  $("lesson-help").hidden=step<=0||showLanding;
   active=step<0?board.n+1:lessonSteps[step][0];
-  $("lesson-title").textContent=step<0?"Source et Écho retrouvés":"Étape "+(step+1)+"/6 · "+name(active);
+  $("lesson-title").textContent=step<0?"Source et Écho retrouvés":(step<3?"Trouver la Source":"Trouver l’Écho")+" · "+(step%3+1)+"/3";
   $("lesson-task").textContent=step<0?(done?"Prise en main terminée.":"Valide ta mission sous la grille."):lessonSteps[step][1];
  }
  const n=board.n,N=n*n,grid=$("map");grid.replaceChildren();grid.style.setProperty("--n",n);
@@ -221,7 +228,11 @@ function render(){
  entries.sort((a,b)=>a.i-b.i);
  const relevant=c=>c.i===active||c.related===active||c.other===active;
  const pinned=entries.find(e=>e.txt===pinnedText);
- const references=pinned?reportReferences(pinned):new Map();
+ const availableClues=entries.filter(relevant);
+ const page=cluePage%Math.max(1,availableClues.length);
+ const visibleReport=pinned||availableClues[page];
+ const references=!guided&&visibleReport?reportReferences(visibleReport):new Map();
+ const anchor=guided&&step>=0?board.clues.find(clue=>clue.a===active):null;
  $("pinned").hidden=!pinned;
  $("pinned-text").textContent=pinned?.txt||"";
  $("pinned-refs").textContent=[...new Set(references.values())].join(" · ");
@@ -267,6 +278,14 @@ function render(){
   if(candidates[p]&&i<0)b.setAttribute("aria-label",b.getAttribute("aria-label")+", hypothèses "+Array.from({length:positions.length},(_,k)=>k).filter(k=>candidates[p]&(1<<k)).map(name).join(", "));
   if(o!=null)b.dataset.object=o;
   if(i>=0){b.dataset.probe=i>=n?"anomaly":i;b.classList.add("with-probe")}
+  if(anchor&&o===anchor.o){
+   const pointer=document.createElement("span");pointer.className="lesson-pointer";
+   pointer.textContent=anchor.dr>0?"↓":anchor.dc<0?"←":"→";
+   b.append(pointer);b.classList.add("lesson-anchor");
+  }
+  if(guided&&step>=0&&(step===0||showLanding)&&p===board.solution[active]){
+   b.classList.add("lesson-landing");b.setAttribute("aria-label",b.getAttribute("aria-label")+", toucher ici pour placer "+name(active));
+  }
   if(references.has(p)){b.classList.add("referenced");b.setAttribute("aria-label",b.getAttribute("aria-label")+", repère du rapport")}
   b.onclick=()=>{place(p);grid.querySelector(`[data-cell="${p}"]`)?.focus({preventScroll:true})};grid.append(b);
  }
@@ -277,8 +296,7 @@ function render(){
  const tick=document.createElement("button");tick.className="file-report";tick.textContent="✓";tick.setAttribute("aria-pressed",String(filed.has(c.txt)));tick.setAttribute("aria-label","Marquer comme exploité : "+c.txt);
  tick.onclick=()=>{snapshot();if(filed.has(c.txt))filed.delete(c.txt);else filed.add(c.txt);render();$("reports").querySelectorAll(".file-report")[entries.indexOf(c)].focus({preventScroll:true})};
  line.append(b,tick);reports.append(line)}
- const focus=$("focus-reports");focus.replaceChildren();const availableClues=entries.filter(relevant);
- const page=cluePage%Math.max(1,availableClues.length);
+ const focus=$("focus-reports");focus.replaceChildren();
  $("cycle-clue").hidden=availableClues.length<2;
  $("cycle-clue").textContent="Suivant · "+(page+1)+"/"+availableClues.length;
  $("focus-panel").hidden=!!pinned;

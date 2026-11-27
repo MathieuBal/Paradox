@@ -3,7 +3,7 @@ const fs=require("node:fs");
 const vm=require("node:vm");
 const storage=new Map();
 class Element{
- constructor(){this.children=[];this.attrs={};this.dataset={};this.style={setProperty(){}};this.classList={add(){},toggle(){}}}
+ constructor(){this.children=[];this.attrs={};this.dataset={};this.style={setProperty(){}};this.classes=new Set();this.classList={add:c=>this.classes.add(c),toggle(){}}}
  append(...nodes){this.children.push(...nodes)}
  replaceChildren(...nodes){this.children=nodes}
  focus(){}
@@ -41,11 +41,17 @@ async function test(){
  assert.equal(saved().board.seed,"miroirs");assert.equal(saved().run.kind,"pilot");
  await ui.training.click();
  assert.deepEqual(saved().positions,Array(6).fill(-1));
+ assert.ok(ui.map.children[0].classes.has("lesson-landing"));
+ assert.ok(ui.map.children[1].classes.has("lesson-anchor"));
  ui.map.children[1].click();assert.match(ui["lesson-feedback"].textContent,/B1/);
  for(const p of [0,10,8,7,13,15]){
   ui.map.children[p].click();ui=boot();
+  if(p===0){
+   assert.ok(!ui.map.children[10].classes.has("lesson-landing"));ui["lesson-help"].click();
+   assert.ok(ui.map.children[10].classes.has("lesson-landing"));
+  }
  }
- assert.equal(ui.validate.hidden,false);ui.validate.click();assert.equal(ui.win.hidden,false);
+ assert.equal(ui.validate.hidden,true);assert.equal(ui.win.hidden,false);
  await ui.next.click();assert.equal(saved().board.seed,"premier-echo");
  console.log("Campagne, reprise, graine double et trois pilotes validés.");
 }

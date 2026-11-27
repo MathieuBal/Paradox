@@ -40,3 +40,12 @@ body:has(#game:not([hidden])) .station-name,#game .map-heading,#game footer,#gam
 #lesson strong{color:#91edf5}#lesson p{margin:.3rem 0 0;line-height:1.4}#lesson-feedback{color:#ffda99}#lesson-feedback:empty{display:none}
 #game.guided :is(#palette,#focus-panel,.panel-head,.legend-drawer,.tools:not(:has(#validate)),#check,#hint,#status,#brief,aside,.archive,.progress-row,progress,#new,.zone-tag){display:none}
 #game.guided #validate{width:100%}#game.guided .coordinate{font-size:.78rem}
+
+#lesson-help{min-height:44px;margin-top:.45rem;font-size:.85rem}
+.guided .map .cell{background-color:#1b2b33;border:1px solid #48606b}
+.guided .map .cell:not(.ray-a):not(.ray-b){background-image:none}
+.guided .map .cell.cross{background-color:#685530}
+.guided .map .cell.lesson-anchor{border:2px solid #ffc977;background-color:#493820}
+.lesson-pointer{position:absolute;right:2px;top:2px;color:#ffe1a4;font:bold 1.35rem/1 system-ui}
+.guided .lesson-landing::after{content:"";position:absolute;width:48%;aspect-ratio:1;border:3px dashed #fff;border-radius:50%;pointer-events:none}
+.guided .coordinate{opacity:.72}.guided .cell-label{font-size:clamp(.64rem,2.6vw,.9rem)}
